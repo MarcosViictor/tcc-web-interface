@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { HardHat, Users, ClipboardCheck, Settings } from "lucide-react"
+import { HardHat, Users, ClipboardCheck, Settings, Shield } from "lucide-react"
 
 export default function HomePage() {
   return (
@@ -24,13 +24,13 @@ export default function HomePage() {
           <Card className="hover:shadow-lg transition-shadow border-2 hover:border-primary">
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Settings className="h-8 w-8 text-primary" />
+                <Shield className="h-8 w-8 text-primary" />
               </div>
               <CardTitle className="text-xl">Administrador</CardTitle>
-              <CardDescription>Gestão completa do sistema e relatórios</CardDescription>
+              <CardDescription>Acesso completo ao sistema</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/admin/dashboard">
+              <Link href="/login/admin">
                 <Button className="w-full" size="lg">
                   Acessar
                 </Button>
@@ -48,7 +48,7 @@ export default function HomePage() {
               <CardDescription>Validação e registro de campo</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/apontador/tarefas">
+              <Link href="/login/apontador">
                 <Button className="w-full bg-secondary hover:bg-secondary/90" size="lg">
                   Acessar
                 </Button>
@@ -66,7 +66,7 @@ export default function HomePage() {
               <CardDescription>Gestão de equipes e atividades</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/encarregado/equipe">
+              <Link href="/login/encarregado">
                 <Button className="w-full bg-accent hover:bg-accent/90" size="lg">
                   Acessar
                 </Button>
@@ -84,7 +84,7 @@ export default function HomePage() {
               <CardDescription>Registro de operação de equipamentos</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/motorista/equipamento">
+              <Link href="/login/motorista">
                 <Button className="w-full bg-success hover:bg-success/90" size="lg">
                   Acessar
                 </Button>

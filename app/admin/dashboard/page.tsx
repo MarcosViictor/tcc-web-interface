@@ -168,10 +168,12 @@ export default function AdminDashboard() {
                     <Upload className="h-6 w-6" />
                     <span className="text-sm">Importar Dados</span>
                   </Button>
-                  <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
-                    <Download className="h-6 w-6" />
-                    <span className="text-sm">Exportar Planilha</span>
-                  </Button>
+                  <Link href="/admin/exportar-dados" className="block">
+                    <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent w-full">
+                      <Download className="h-6 w-6" />
+                      <span className="text-sm">Exportar Planilha</span>
+                    </Button>
+                  </Link>
                   <Button variant="outline" className="h-auto flex-col gap-2 py-4 bg-transparent">
                     <Clock className="h-6 w-6" />
                     <span className="text-sm">Histórico</span>
@@ -190,7 +192,9 @@ export default function AdminDashboard() {
                   <CardDescription>Gerenciar cadastro de obras</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/obras">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -200,7 +204,9 @@ export default function AdminDashboard() {
                   <CardDescription>Gerenciar frota de equipamentos</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/equipamentos">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -210,7 +216,9 @@ export default function AdminDashboard() {
                   <CardDescription>Importar e gerenciar equipes</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/funcionarios">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -220,7 +228,9 @@ export default function AdminDashboard() {
                   <CardDescription>Fornecedores e terceirizados</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/contratos">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -230,7 +240,9 @@ export default function AdminDashboard() {
                   <CardDescription>Configurar descontos e regras</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/criterios-medicao">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -240,7 +252,9 @@ export default function AdminDashboard() {
                   <CardDescription>Cadastro de serviços</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">Acessar</Button>
+                  <Link href="/admin/cadastros/atividades">
+                    <Button className="w-full">Acessar</Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
@@ -342,14 +356,16 @@ export default function AdminDashboard() {
                     <Button className="w-full">Gerar RDO</Button>
                   </div>
 
-                  <div className="p-6 rounded-lg border-2 hover:border-primary transition-colors">
-                    <Download className="h-8 w-8 text-primary mb-3" />
-                    <h3 className="font-semibold mb-2">Exportar Dados</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Exportar planilhas para análise externa</p>
-                    <Button className="w-full bg-transparent" variant="outline">
-                      Exportar
-                    </Button>
-                  </div>
+                  <Link href="/admin/exportar-dados" className="block">
+                    <div className="p-6 rounded-lg border-2 hover:border-primary transition-colors h-full">
+                      <Download className="h-8 w-8 text-primary mb-3" />
+                      <h3 className="font-semibold mb-2">Exportar Dados</h3>
+                      <p className="text-sm text-muted-foreground mb-4">Exportar planilhas para análise externa</p>
+                      <Button className="w-full bg-transparent" variant="outline">
+                        Acessar
+                      </Button>
+                    </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

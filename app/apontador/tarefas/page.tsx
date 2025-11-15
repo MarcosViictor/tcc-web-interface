@@ -107,10 +107,12 @@ export default function ApontadorTarefas() {
                   </div>
                 </div>
 
-                <Button className="w-full" size="lg">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Iniciar Jornada
-                </Button>
+                <Link href="/apontador/registro-equipamento" className="block">
+                  <Button className="w-full" size="lg">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Iniciar Jornada
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -145,10 +147,12 @@ export default function ApontadorTarefas() {
                   </div>
                 </div>
 
-                <Button className="w-full bg-transparent" size="lg" variant="outline">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Finalizar Jornada
-                </Button>
+                <Link href="/apontador/registro-equipamento" className="block">
+                  <Button className="w-full bg-transparent" size="lg" variant="outline">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Finalizar Jornada
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -219,10 +223,12 @@ export default function ApontadorTarefas() {
                   </div>
                 </div>
 
-                <Button className="w-full" size="lg">
-                  Validar e Quantificar
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
+                <Link href="/apontador/registro-mao-obra" className="block">
+                  <Button className="w-full" size="lg">
+                    Validar e Quantificar
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 

@@ -5,31 +5,70 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Users, UserCheck, UserX, Search, Plus, CheckCircle2, ChevronRight } from "lucide-react"
+import { Users, UserCheck, UserX, Search, Plus, CheckCircle2, AlertCircle, FileText } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+interface Funcionario {
+  id: number
+  matricula: string
+  nome: string
+  presente: boolean
+  atividade: string | null
+}
 
 export default function EncarregadoEquipe() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedActivity, setSelectedActivity] = useState<string | null>(null)
-
-  const funcionarios = [
-    { id: 1, matricula: "001234", nome: "José da Silva", presente: true, atividade: "Escavação" },
-    { id: 2, matricula: "001235", nome: "Maria Santos", presente: true, atividade: "Escavação" },
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([
+    { id: 1, matricula: "001234", nome: "José da Silva", presente: true, atividade: null },
+    { id: 2, matricula: "001235", nome: "Maria Santos", presente: true, atividade: null },
     { id: 3, matricula: "001236", nome: "Pedro Oliveira", presente: true, atividade: null },
     { id: 4, matricula: "001237", nome: "Ana Costa", presente: false, atividade: null },
-    { id: 5, matricula: "001238", nome: "Carlos Mendes", presente: true, atividade: "Compactação" },
+    { id: 5, matricula: "001238", nome: "Carlos Mendes", presente: true, atividade: null },
     { id: 6, matricula: "001239", nome: "Lucia Ferreira", presente: true, atividade: null },
-  ]
+  ])
 
-  const atividades = [
-    { id: "escavacao", nome: "Escavação de Vala", icon: "⛏️", alocados: 2 },
-    { id: "compactacao", nome: "Compactação de Aterro", icon: "🚜", alocados: 1 },
-    { id: "transporte", nome: "Transporte de Material", icon: "🚛", alocados: 0 },
-    { id: "nivelamento", nome: "Nivelamento de Pista", icon: "📏", alocados: 0 },
-  ]
+  const togglePresenca = (id: number) => {
+    setFuncionarios(funcionarios.map(f => 
+      f.id === id ? { ...f, presente: !f.presente } : f
+    ))
+  }
+
+  const adicionarFuncionario = () => {
+    if (!searchTerm) return
+    
+    // TODO: Buscar funcionário no backend pela matrícula
+    const novoFunc: Funcionario = {
+      id: Date.now(),
+      matricula: searchTerm,
+      nome: "Novo Funcionário", // Virá do backend
+      presente: false,
+      atividade: null,
+    }
+    
+    setFuncionarios([...funcionarios, novoFunc])
+    setSearchTerm("")
+  }
+
+  const confirmarApontamento = () => {
+    // TODO: Enviar dados para o backend
+    const payload = {
+      encarregado: "Pedro Santos",
+      data: new Date().toISOString().split('T')[0],
+      funcionarios: funcionarios.map(f => ({
+        matricula: f.matricula,
+        nome: f.nome,
+        presente: f.presente,
+      }))
+    }
+    
+    console.log("Confirmando apontamento:", payload)
+    alert("Apontamento confirmado com sucesso!")
+  }
 
   const presentes = funcionarios.filter((f) => f.presente).length
-  const alocados = funcionarios.filter((f) => f.presente && f.atividade).length
+  const ausentes = funcionarios.filter((f) => !f.presente).length
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -71,9 +110,9 @@ export default function EncarregadoEquipe() {
 
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="pt-4 text-center">
-              <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold text-primary">{alocados}</div>
-              <p className="text-xs text-muted-foreground">Alocados</p>
+              <AlertCircle className="h-6 w-6 mx-auto mb-2 text-destructive" />
+              <div className="text-2xl font-bold text-destructive">{ausentes}</div>
+              <p className="text-xs text-muted-foreground">Ausentes</p>
             </CardContent>
           </Card>
         </div>
@@ -95,7 +134,7 @@ export default function EncarregadoEquipe() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button>
+              <Button onClick={adicionarFuncionario}>
                 <Plus className="h-4 w-4 mr-2" />
                 Adicionar
               </Button>
@@ -138,6 +177,7 @@ export default function EncarregadoEquipe() {
                     size="sm"
                     variant={func.presente ? "default" : "outline"}
                     className={func.presente ? "bg-success hover:bg-success/90" : ""}
+                    onClick={() => togglePresenca(func.id)}
                   >
                     {func.presente ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
                   </Button>
@@ -147,53 +187,29 @@ export default function EncarregadoEquipe() {
           </CardContent>
         </Card>
 
-        {/* Alocação de Atividades */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Alocar em Atividades</CardTitle>
-            <CardDescription>Arraste ou toque para alocar funcionários</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {atividades.map((ativ) => (
-                <div
-                  key={ativ.id}
-                  className="p-4 rounded-lg border-2 border-dashed hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => setSelectedActivity(ativ.id)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">{ativ.icon}</div>
-                      <div>
-                        <div className="font-semibold">{ativ.nome}</div>
-                        <div className="text-sm text-muted-foreground">{ativ.alocados} funcionário(s) alocado(s)</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
+        {/* Ações */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <Link href="/encarregado/criar-atividade">
+            <Button variant="outline" className="w-full" size="lg">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Atividade
+            </Button>
+          </Link>
+          <Link href="/encarregado/diario-obra">
+            <Button className="w-full bg-accent hover:bg-accent/90" size="lg">
+              <FileText className="h-4 w-4 mr-2" />
+              Diário de Obra
+            </Button>
+          </Link>
+        </div>
 
-                  {/* Funcionários alocados nesta atividade */}
-                  {funcionarios.filter((f) => f.atividade === ativ.nome.split(" ")[0]).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
-                      {funcionarios
-                        .filter((f) => f.atividade === ativ.nome.split(" ")[0])
-                        .map((f) => (
-                          <Badge key={f.id} variant="secondary" className="text-xs">
-                            {f.nome.split(" ")[0]}
-                          </Badge>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Botão de Confirmação */}
-        <div className="fixed bottom-6 left-4 right-4">
-          <Button className="w-full" size="lg">
-            <CheckCircle2 className="h-5 w-5 mr-2" />
+        <div className="sticky bottom-4">
+          <Button 
+            onClick={confirmarApontamento}
+            className="w-full bg-secondary hover:bg-secondary/90" 
+            size="lg"
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
             Confirmar Apontamento
           </Button>
         </div>
