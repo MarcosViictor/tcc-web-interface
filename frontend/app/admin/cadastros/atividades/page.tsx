@@ -1,20 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, Clipboard } from "lucide-react"
 import Link from "next/link"
+import { useAtividadesApi } from "@/api/AtividadesApi"
+import { useAuth } from "@/contexts/AuthContext"
 
-interface Atividade {
+interface AtividadeUI {
   id: string
   codigo: string
   descricao: string
   unidade: string
   categoria: string
   precoUnitario: number
+  ativa: boolean
 }
 
 export default function CadastroAtividadesPage() {
@@ -27,75 +30,125 @@ export default function CadastroAtividadesPage() {
     unidade: "",
     categoria: "",
     precoUnitario: "",
+    ativa: true,
   })
 
-  const [atividades, setAtividades] = useState<Atividade[]>([
-    {
-      id: "1",
-      codigo: "001.001",
-      descricao: "Escavação de Vala",
-      unidade: "m³",
-      categoria: "Terraplenagem",
-      precoUnitario: 45.50,
-    },
-    {
-      id: "2",
-      codigo: "001.002",
-      descricao: "Compactação de Aterro",
-      unidade: "m³",
-      categoria: "Terraplenagem",
-      precoUnitario: 32.00,
-    },
-    {
-      id: "3",
-      codigo: "002.001",
-      descricao: "Transporte de Material (DMT < 5km)",
-      unidade: "m³.km",
-      categoria: "Transporte",
-      precoUnitario: 8.75,
-    },
-    {
-      id: "4",
-      codigo: "003.001",
-      descricao: "Aplicação de Revestimento Asfáltico",
-      unidade: "m²",
-      categoria: "Pavimentação",
-      precoUnitario: 125.00,
-    },
-  ])
+  const { getAtividades, createAtividade, updateAtividade, deleteAtividade } = useAtividadesApi()
+  const { isAuthenticated } = useAuth()
+  const [atividades, setAtividades] = useState<AtividadeUI[]>([])
+  const [editing, setEditing] = useState<AtividadeUI | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [categorias, setCategorias] = useState<Array<{id:number; nome:string; descricao?:string}>>([])
+  const [creatingCategoria, setCreatingCategoria] = useState(false)
+  const [novaCategoria, setNovaCategoria] = useState({ nome: "", descricao: "" })
 
-  const categorias = [
-    "Terraplenagem",
-    "Transporte",
-    "Pavimentação",
-    "Drenagem",
-    "Obras de Arte",
-    "Sinalização",
-    "Obras Complementares",
-    "Meio Ambiente",
-  ]
-
-  const unidades = ["m³", "m²", "m", "m³.km", "un", "kg", "t", "h"]
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const novaAtividade: Atividade = {
-      id: Date.now().toString(),
-      codigo: formData.codigo,
-      descricao: formData.descricao,
-      unidade: formData.unidade,
-      categoria: formData.categoria,
-      precoUnitario: parseFloat(formData.precoUnitario),
+  function fromApi(a: any): AtividadeUI {
+    return {
+      id: String(a.id),
+      codigo: a.codigo,
+      descricao: a.descricao,
+      unidade: a.unidade,
+      categoria: a.categoria_nome || a.categoria?.nome || a.categoria || '',
+      precoUnitario: a.preco_unitario ? Number(a.preco_unitario) : 0,
+      ativa: a.ativa !== undefined ? a.ativa : true,
     }
-    setAtividades([...atividades, novaAtividade])
-    setFormData({
-      codigo: "",
-      descricao: "",
-      unidade: "",
-      categoria: "",
-      precoUnitario: "",
-    })
+  }
+
+  function toApi(payload: typeof formData) {
+    return {
+      codigo: payload.codigo,
+      descricao: payload.descricao,
+      unidade: payload.unidade,
+      preco_unitario: payload.precoUnitario ? parseFloat(payload.precoUnitario) : 0,
+      categoria: payload.categoria ? parseInt(payload.categoria, 10) : undefined,
+      obra: 1,
+      ativa: payload.ativa,
+    }
+  }
+
+  async function fetchAtividades() {
+    if (!isAuthenticated) return
+    setLoading(true); setError(null)
+    try {
+      const data = await getAtividades()
+      const list = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []
+      setAtividades(list.map(fromApi))
+    } catch (err) {
+      console.error('Erro ao carregar atividades', err)
+      setError('Falha ao carregar atividades')
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { fetchAtividades() }, [isAuthenticated])
+
+  const { getCategoriasAtividades, createCategoriaAtividade } = useAtividadesApi()
+  async function fetchCategorias() {
+    if (!isAuthenticated) return
+    try {
+      const data = await getCategoriasAtividades()
+      const list = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []
+      setCategorias(list)
+    } catch (err) {
+      console.error('Erro ao carregar categorias', err)
+    }
+  }
+  useEffect(() => { fetchCategorias() }, [isAuthenticated])
+
+  const unidades = ["m", "m2", "m3", "kg", "t", "un", "h", "dia"]
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editing) {
+      try {
+        const payload = toApi(formData)
+        const updated = await updateAtividade(Number(editing.id), payload)
+        const mapped = fromApi(updated)
+        setAtividades(atividades.map(a => a.id === editing.id ? mapped : a))
+        setEditing(null)
+      } catch (err) {
+        console.error('Erro ao atualizar atividade', err)
+        alert('Falha ao atualizar atividade')
+        return
+      }
+    } else {
+      try {
+        const payload = toApi(formData)
+        const created = await createAtividade(payload)
+        const mapped = fromApi(created)
+        setAtividades([mapped, ...atividades])
+      } catch (err) {
+        console.error('Erro ao criar atividade', err)
+        alert('Falha ao criar atividade')
+        return
+      }
+    }
+    setFormData({ codigo: "", descricao: "", unidade: "", categoria: "", precoUnitario: "", ativa: true })
     setShowForm(false)
+  }
+
+  const handleEdit = (a: AtividadeUI) => {
+    setEditing(a)
+    setFormData({
+      codigo: a.codigo,
+      descricao: a.descricao,
+      unidade: a.unidade,
+      categoria: a.categoria,
+      precoUnitario: String(a.precoUnitario),
+      ativa: a.ativa,
+    })
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir atividade?')) return
+    try {
+      await deleteAtividade(Number(id))
+      setAtividades(atividades.filter(a => a.id !== id))
+    } catch (err) {
+      console.error('Erro ao excluir atividade', err)
+      alert('Falha ao excluir atividade')
+    }
   }
 
   const filteredAtividades = atividades.filter(a =>
@@ -108,7 +161,7 @@ export default function CadastroAtividadesPage() {
     if (!acc[ativ.categoria]) acc[ativ.categoria] = []
     acc[ativ.categoria].push(ativ)
     return acc
-  }, {} as Record<string, Atividade[]>)
+  }, {} as Record<string, AtividadeUI[]>)
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -141,15 +194,15 @@ export default function CadastroAtividadesPage() {
           </div>
           <Button onClick={() => setShowForm(!showForm)} className="bg-secondary hover:bg-secondary/90">
             <Plus className="h-4 w-4 mr-2" />
-            Nova Atividade
+            {editing ? 'Editar Atividade' : 'Nova Atividade'}
           </Button>
         </div>
 
         {showForm && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Nova Atividade</CardTitle>
-              <CardDescription>Cadastrar serviço ou item de medição</CardDescription>
+              <CardTitle>{editing ? 'Editar Atividade' : 'Nova Atividade'}</CardTitle>
+              <CardDescription>{editing ? 'Atualize os dados da atividade' : 'Cadastrar serviço ou item de medição'}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -196,14 +249,64 @@ export default function CadastroAtividadesPage() {
                     <select
                       className="w-full h-10 px-3 rounded-md border border-input bg-background"
                       value={formData.categoria}
-                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === "__new__") {
+                          setCreatingCategoria(true)
+                        
+                          setFormData({ ...formData, categoria: "" })
+                        } else {
+                          setCreatingCategoria(false)
+                          setFormData({ ...formData, categoria: val })
+                        }
+                      }}
                       required
                     >
                       <option value="">Selecione...</option>
                       {categorias.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat.id} value={String(cat.id)}>{cat.nome}</option>
                       ))}
+                      <option value="__new__">+ Criar nova categoria…</option>
                     </select>
+
+                    {creatingCategoria && (
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <Input
+                          placeholder="Nome da categoria"
+                          value={novaCategoria.nome}
+                          onChange={(e) => setNovaCategoria({ ...novaCategoria, nome: e.target.value })}
+                        />
+                        <Input
+                          placeholder="Descrição (opcional)"
+                          value={novaCategoria.descricao}
+                          onChange={(e) => setNovaCategoria({ ...novaCategoria, descricao: e.target.value })}
+                        />
+                        <Button
+                          type="button"
+                          className="bg-secondary hover:bg-secondary/90"
+                          onClick={async () => {
+                            if (!novaCategoria.nome.trim()) {
+                              alert('Informe um nome para a categoria')
+                              return
+                            }
+                            try {
+                              const created = await createCategoriaAtividade(novaCategoria.nome.trim(), novaCategoria.descricao || undefined)
+                              // Atualiza lista e seleciona a nova
+                              const novoItem = { id: created.id, nome: created.nome, descricao: created.descricao }
+                              setCategorias([novoItem, ...categorias])
+                              setFormData({ ...formData, categoria: String(created.id) })
+                              setNovaCategoria({ nome: "", descricao: "" })
+                              setCreatingCategoria(false)
+                            } catch (err) {
+                              console.error('Erro ao criar categoria', err)
+                              alert('Falha ao criar categoria')
+                            }
+                          }}
+                        >
+                          Criar
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -223,7 +326,7 @@ export default function CadastroAtividadesPage() {
                     Cancelar
                   </Button>
                   <Button type="submit" className="bg-secondary hover:bg-secondary/90">
-                    Cadastrar
+                    {editing ? 'Salvar' : 'Cadastrar'}
                   </Button>
                 </div>
               </form>
@@ -233,8 +336,9 @@ export default function CadastroAtividadesPage() {
 
         <div className="space-y-6">
           <h2 className="text-lg font-semibold">
-            Atividades Cadastradas ({filteredAtividades.length})
+            Atividades Cadastradas ({filteredAtividades.length}) {loading && <span className="text-xs">(carregando...)</span>}
           </h2>
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           {Object.entries(atividadesPorCategoria).map(([categoria, ativs]) => (
             <div key={categoria}>
@@ -269,10 +373,10 @@ export default function CadastroAtividadesPage() {
                           )}
                         </div>
                         <div className="flex gap-2 ml-4">
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(ativ)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-destructive">
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(ativ.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

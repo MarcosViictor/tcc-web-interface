@@ -451,29 +451,30 @@ POST {{baseUrl}}/api/registros-mao-obra/{{registroMaoObraId}}/validar
 Authorization: Bearer {{token}}
 
 ### ATIVIDADES EQUIPE - Lista (?obra=ID&encarregado=ID&data=YYYY-MM-DD&status=planejada|em_andamento|concluida)
-GET {{baseUrl}}/api/atividades-equipe?obra={{obraId}}&status=planejada
+GET {{baseUrl}}/api/atividades
 Authorization: Bearer {{token}}
 
 ### ATIVIDADES EQUIPE - Criar
-POST {{baseUrl}}/api/atividades-equipe
+POST {{baseUrl}}/api/atividades
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "obra": {{obraId}},
-  "encarregado": {{usuarioId}},
-  "atividade": {{atividadeId}},
-  "data": "2025-11-15",
-  "status": "planejada",
-  "observacoes": "Iniciar após chegada do material"
+  "codigo": "SERV-001",
+  "descricao": "Escavação de vala",
+  "unidade": "m3",
+  "categoria": 1,
+  "preco_unitario": 150.00,
+  "obra": 1,
+  "ativa": true
 }
 
 ### ATIVIDADES EQUIPE - Detalhe
-GET {{baseUrl}}/api/atividades-equipe/{{atividadeEquipeId}}
+GET {{baseUrl}}/api/atividades/{{atividadeId}}
 Authorization: Bearer {{token}}
 
 ### ATIVIDADES EQUIPE - Atualizar
-PUT {{baseUrl}}/api/atividades-equipe/{{atividadeEquipeId}}
+PUT {{baseUrl}}/api/atividades/{{atividadeId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
