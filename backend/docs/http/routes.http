@@ -162,7 +162,7 @@ DELETE {{baseUrl}}/api/obras/{{obraId}}
 Authorization: Bearer {{token}}
 
 ### EQUIPAMENTOS - Lista (?obra=ID&status=ativo&tipo=caminhao)
-GET {{baseUrl}}/api/equipamentos?obra={{obraId}}&status=ativo&tipo=caminhao
+GET {{baseUrl}}/api/equipamentos
 Authorization: Bearer {{token}}
 
 ### EQUIPAMENTOS - Criar
@@ -179,8 +179,7 @@ Content-Type: application/json
   "ano": 2020,
   "horimetro_atual": 1500.5,
   "status": "ativo",
-  "obra": {{obraId}},
-  "motorista": {{usuarioId}}
+  "obra": 1
 }
 
 ### EQUIPAMENTOS - Detalhe
@@ -207,7 +206,7 @@ Content-Type: application/json
 }
 
 ### EQUIPAMENTOS - Remover
-DELETE {{baseUrl}}/api/equipamentos/{{equipamentoId}}
+DELETE {{baseUrl}}/api/equipamentos/1
 Authorization: Bearer {{token}}
 
 ### CONTRATOS - Lista (?obra=ID)

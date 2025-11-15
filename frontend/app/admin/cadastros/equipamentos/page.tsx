@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, Truck, Wrench, CheckCircle2, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useEquipamentosApi } from "@/api/EquipamentosApi"
+import { useAuth } from "@/contexts/AuthContext"
 
-interface Equipamento {
+interface EquipamentoUI {
   id: string
   nome: string
   tipo: string
@@ -24,7 +26,11 @@ interface Equipamento {
 export default function CadastroEquipamentosPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [editingEquip, setEditingEquip] = useState<Equipamento | null>(null)
+  const [editingEquip, setEditingEquip] = useState<EquipamentoUI | null>(null)
+  const { getEquipamentos, createEquipamento, updateEquipamento, deleteEquipamento } = useEquipamentosApi()
+  const { isAuthenticated } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     nome: "",
@@ -39,89 +45,87 @@ export default function CadastroEquipamentosPage() {
     combustivel: "Diesel",
   })
 
-  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([
-    {
-      id: "1",
-      nome: "Escavadeira 104.F570",
-      tipo: "Escavadeira Hidráulica",
-      modelo: "320D",
-      placa: "ABC-1234",
-      fabricante: "Caterpillar",
-      anoFabricacao: "2020",
-      horimetroAtual: 2450,
-      status: "ativo",
-      ultimaManutencao: "2024-11-01",
-    },
-    {
-      id: "2",
-      nome: "Caminhão 205.G320",
-      tipo: "Caminhão Basculante",
-      modelo: "2726",
-      placa: "DEF-5678",
-      fabricante: "Mercedes-Benz",
-      anoFabricacao: "2019",
-      horimetroAtual: 5200,
-      status: "ativo",
-      ultimaManutencao: "2024-10-28",
-    },
-    {
-      id: "3",
-      nome: "Motoniveladora 301.H450",
-      tipo: "Motoniveladora",
-      modelo: "140K",
-      placa: "GHI-9012",
-      fabricante: "Caterpillar",
-      anoFabricacao: "2021",
-      horimetroAtual: 1850,
-      status: "manutencao",
-      ultimaManutencao: "2024-11-10",
-    },
-  ])
+  const [equipamentos, setEquipamentos] = useState<EquipamentoUI[]>([])
+
+  // Mapping helpers
+  function fromApi(e: any): EquipamentoUI {
+    return {
+      id: String(e.id),
+      nome: e.nome || '',
+      tipo: e.tipo || '',
+      modelo: e.modelo || '',
+      placa: e.placa || '',
+      fabricante: e.fabricante || '',
+      anoFabricacao: e.ano ? String(e.ano) : '',
+      horimetroAtual: e.horimetro_atual || 0,
+      status: (e.status || 'ativo'),
+      ultimaManutencao: e.updated_at || e.created_at || new Date().toISOString(),
+    }
+  }
+
+  function toApi(payload: typeof formData, existing?: EquipamentoUI) {
+    return {
+      nome: payload.nome,
+      tipo: payload.tipo,
+      modelo: payload.modelo,
+      placa: payload.placa,
+      fabricante: payload.fabricante,
+      ano: payload.anoFabricacao ? parseInt(payload.anoFabricacao, 10) : undefined,
+      horimetro_atual: payload.horimetroInicial ? parseFloat(payload.horimetroInicial) : undefined,
+      status: existing?.status || 'ativo',
+      obra: 1, // TODO: selecionar obra real
+    }
+  }
+
+  async function fetchEquipamentos() {
+    if (!isAuthenticated) return
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getEquipamentos()
+      const list = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : []
+      setEquipamentos(list.map(fromApi))
+    } catch (err: any) {
+      console.error('Erro ao carregar equipamentos:', err)
+      setError('Falha ao carregar equipamentos')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchEquipamentos() }, [isAuthenticated])
 
   const tiposEquipamento = [
-    "Escavadeira Hidráulica",
-    "Caminhão Basculante",
-    "Motoniveladora",
-    "Pá Carregadeira",
-    "Rolo Compactador",
-    "Retroescavadeira",
-    "Trator de Esteiras",
-    "Caminhão Pipa",
+   `caminhao`, `escavadeira`, `rolo_compactador`, `motoniveladora`, `retroescavadeira`, `trator`, `carregadeira`, `patrol`
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (editingEquip) {
-      setEquipamentos(equipamentos.map(equip => 
-        equip.id === editingEquip.id 
-          ? { 
-              ...equip, 
-              nome: formData.nome,
-              tipo: formData.tipo,
-              modelo: formData.modelo,
-              placa: formData.placa,
-              fabricante: formData.fabricante,
-              anoFabricacao: formData.anoFabricacao,
-            }
-          : equip
-      ))
-    } else {
-      const novoEquip: Equipamento = {
-        id: Date.now().toString(),
-        nome: formData.nome,
-        tipo: formData.tipo,
-        modelo: formData.modelo,
-        placa: formData.placa,
-        fabricante: formData.fabricante,
-        anoFabricacao: formData.anoFabricacao,
-        horimetroAtual: parseFloat(formData.horimetroInicial) || 0,
-        status: "ativo",
-        ultimaManutencao: new Date().toISOString().split("T")[0],
+      try {
+        const payload = toApi(formData, editingEquip)
+        const updated = await updateEquipamento(Number(editingEquip.id), payload)
+        const mapped = fromApi(updated)
+        setEquipamentos(equipamentos.map(e => e.id === editingEquip.id ? mapped : e))
+      } catch (err) {
+        console.error('Erro ao atualizar equipamento:', err)
+        alert('Falha ao atualizar equipamento.')
+        return
       }
-      setEquipamentos([...equipamentos, novoEquip])
+    } else {
+      try {
+        const payload = toApi(formData)
+        const created = await createEquipamento(payload)
+        const mapped = fromApi(created)
+        setEquipamentos([mapped, ...equipamentos])
+      } catch (err) {
+        console.error('Erro ao criar equipamento:', err)
+        alert('Falha ao criar equipamento.')
+        return
+      }
     }
-    
+
     setFormData({
       nome: "",
       tipo: "",
@@ -138,7 +142,7 @@ export default function CadastroEquipamentosPage() {
     setEditingEquip(null)
   }
 
-  const handleEdit = (equip: Equipamento) => {
+  const handleEdit = (equip: EquipamentoUI) => {
     setEditingEquip(equip)
     setFormData({
       nome: equip.nome,
@@ -155,13 +159,18 @@ export default function CadastroEquipamentosPage() {
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este equipamento?")) {
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este equipamento?")) return
+    try {
+      await deleteEquipamento(Number(id))
       setEquipamentos(equipamentos.filter(e => e.id !== id))
+    } catch (err) {
+      console.error('Erro ao excluir equipamento:', err)
+      alert('Falha ao excluir equipamento.')
     }
   }
 
-  const getStatusBadge = (status: Equipamento["status"]) => {
+  const getStatusBadge = (status: EquipamentoUI["status"]) => {
     const variants = {
       ativo: { 
         label: "Ativo", 
@@ -378,9 +387,10 @@ export default function CadastroEquipamentosPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Equipamentos Cadastrados ({filteredEquipamentos.length})
+              Equipamentos Cadastrados ({filteredEquipamentos.length}) {loading && <span className="text-xs">(carregando...)</span>}
             </h2>
           </div>
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           {filteredEquipamentos.length === 0 ? (
             <Card>
@@ -439,7 +449,7 @@ export default function CadastroEquipamentosPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Horímetro:</span>
-                        <span className="font-medium">{equip.horimetroAtual.toFixed(1)}h</span>
+                        <span className="font-medium">{equip.horimetroAtual}h</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Última Manutenção:</span>
