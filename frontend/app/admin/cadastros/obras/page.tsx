@@ -1,12 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { use, useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, MapPin, Calendar, Building2 } from "lucide-react"
 import Link from "next/link"
+
+import { useObraApi } from "@/api/ObraApi"
+import { useAuth } from "@/contexts/AuthContext"
+import { Obra as ApiObra } from "@/lib/types/ObraTypes"
 
 interface Obra {
   id: string
@@ -15,7 +19,7 @@ interface Obra {
   local: string
   dataInicio: string
   dataPrevisaoTermino: string
-  status: "ativa" | "pausada" | "concluida"
+  status: string
   responsavel: string
 }
 
@@ -23,6 +27,10 @@ export default function CadastroObrasPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editingObra, setEditingObra] = useState<Obra | null>(null)
+  const { getObras, createObra, updateObra, deleteObra } = useObraApi();
+  const { isAuthenticated } = useAuth();
+  const [obras, setObras] = useState<Obra[]>([])
+
   
   const [formData, setFormData] = useState({
     nome: "",
@@ -37,62 +45,77 @@ export default function CadastroObrasPage() {
     descricao: "",
   })
 
-  const [obras, setObras] = useState<Obra[]>([
-    {
-      id: "1",
-      nome: "Rodovia BR-116 - Trecho Cariri",
-      codigo: "BR116-CARIRI-2024",
-      local: "CE - Juazeiro do Norte a Barbalha",
-      dataInicio: "2024-01-15",
-      dataPrevisaoTermino: "2025-12-31",
-      status: "ativa",
-      responsavel: "Eng. João Carlos Silva",
-    },
-    {
-      id: "2",
-      nome: "Duplicação BR-230 - Trecho Paraíba",
-      codigo: "BR230-PB-2023",
-      local: "PB - João Pessoa a Campina Grande",
-      dataInicio: "2023-06-01",
-      dataPrevisaoTermino: "2025-06-30",
-      status: "ativa",
-      responsavel: "Eng. Maria Oliveira",
-    },
-  ])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (editingObra) {
-      // Editar obra existente
-      setObras(obras.map(obra => 
-        obra.id === editingObra.id 
-          ? { 
-              ...obra, 
-              nome: formData.nome,
-              codigo: formData.codigo,
-              local: formData.local,
-              dataInicio: formData.dataInicio,
-              dataPrevisaoTermino: formData.dataPrevisaoTermino,
-              responsavel: formData.responsavel,
-            }
-          : obra
-      ))
-    } else {
-      // Criar nova obra
-      const novaObra: Obra = {
-        id: Date.now().toString(),
-        nome: formData.nome,
-        codigo: formData.codigo,
-        local: formData.local,
-        dataInicio: formData.dataInicio,
-        dataPrevisaoTermino: formData.dataPrevisaoTermino,
-        status: "ativa",
-        responsavel: formData.responsavel,
+      try {
+        const payload: Partial<ApiObra> = {
+          codigo: formData.codigo,
+          nome: formData.nome,
+          local: formData.local,
+          km_inicial: formData.kmInicial ? parseFloat(formData.kmInicial) : 0,
+          km_final: formData.kmFinal ? parseFloat(formData.kmFinal) : 0,
+          data_inicio: formData.dataInicio,
+          data_prevista_fim: formData.dataPrevisaoTermino,
+          status: toApiStatus(editingObra.status || 'em_andamento'),
+          // responsavel pode ser id ou null; manter como undefined para não alterar
+        }
+
+        const updated = await updateObra(Number(editingObra.id), payload)
+
+        const mapped: Obra = {
+          id: String(updated.id),
+          nome: updated.nome,
+          codigo: updated.codigo,
+          local: updated.local,
+          dataInicio: updated.data_inicio,
+          dataPrevisaoTermino: updated.data_prevista_fim,
+          status: updated.status,
+          responsavel: updated.responsavel_nome || '',
+        }
+
+        setObras(obras.map(o => (o.id === editingObra.id ? mapped : o)))
+      } catch (err) {
+        console.error('Erro ao atualizar obra:', err)
+        alert('Falha ao atualizar obra. Verifique os campos e tente novamente.')
+        return
       }
-      setObras([...obras, novaObra])
+    } else {
+      try {
+        const payload: Omit<ApiObra, 'id' | 'status'> & { status?: string } = {
+          codigo: formData.codigo,
+          nome: formData.nome,
+          local: formData.local,
+          km_inicial: formData.kmInicial ? parseFloat(formData.kmInicial) : 0,
+          km_final: formData.kmFinal ? parseFloat(formData.kmFinal) : 0,
+          data_inicio: formData.dataInicio,
+          data_prevista_fim: formData.dataPrevisaoTermino,
+          responsavel: undefined, // precisa ser id de usuário; manter undefined/null
+          numero_contrato: formData.contrato || undefined,
+          descricao: formData.descricao || undefined,
+        }
+        // Envia para API; status padrão é 'planejamento' no backend
+        const created = await createObra(payload)
+        // Mapeia resposta para interface interna
+        const mapped: Obra = {
+          id: String(created.id),
+          nome: created.nome,
+          codigo: created.codigo,
+          local: created.local,
+          dataInicio: created.data_inicio,
+          dataPrevisaoTermino: created.data_prevista_fim,
+          status: created.status || 'planejamento',
+          responsavel: created.responsavel_nome || '',
+        }
+        setObras([mapped, ...obras])
+      } catch (err) {
+        console.error('Erro ao criar obra:', err)
+        alert('Falha ao criar obra. Verifique os campos e tente novamente.')
+      }
     }
-    
+
     // Reset form
     setFormData({
       nome: "",
@@ -127,19 +150,27 @@ export default function CadastroObrasPage() {
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir esta obra?")) {
-      setObras(obras.filter(obra => obra.id !== id))
+      try {
+        await deleteObra(Number(id));
+        setObras(obras.filter(obra => obra.id !== id));
+      } catch (err) {
+        console.error('Erro ao excluir obra:', err);
+        alert('Falha ao excluir obra. Tente novamente.');
+      }
     }
   }
 
   const getStatusBadge = (status: Obra["status"]) => {
-    const variants = {
+    const variants: Record<string, { label: string; className: string }> = {
       ativa: { label: "Ativa", className: "bg-success/10 text-success border-success/30" },
       pausada: { label: "Pausada", className: "bg-warning/10 text-warning border-warning/30" },
       concluida: { label: "Concluída", className: "bg-muted text-muted-foreground" },
+      em_andamento: { label: "Em Andamento", className: "bg-success/10 text-success border-success/30" },
+      suspensa: { label: "Suspensa", className: "bg-warning/10 text-warning border-warning/30" },
     }
-    const variant = variants[status]
+    const variant = variants[status] || { label: status || "Indefinido", className: "bg-muted text-muted-foreground" }
     return <Badge variant="outline" className={variant.className}>{variant.label}</Badge>
   }
 
@@ -148,6 +179,46 @@ export default function CadastroObrasPage() {
     obra.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     obra.local.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+
+
+  function mapStatus(status: string): string {
+    if (status === 'em_andamento') return 'em_andamento';
+    if (status === 'suspensa') return 'suspensa';
+    return status; // concluida ou já mapeado
+  }
+
+  const allowedApiStatuses = new Set(['em_andamento','concluida','suspensa'])
+  function toApiStatus(status: string): ApiObra['status'] {
+    return (allowedApiStatuses.has(status) ? (status as ApiObra['status']) : 'em_andamento')
+  }
+
+  async function fetchObras() {
+    try {
+      const data = await getObras();
+      const mapped = (data.results || []).map((o: any): Obra => ({
+        id: String(o.id),
+        nome: o.nome || '',
+        codigo: o.codigo || '',
+        local: o.local || '',
+        dataInicio: o.data_inicio || o.dataInicio || '',
+        dataPrevisaoTermino: o.data_prevista_fim || o.dataPrevisaoTermino || '',
+        status: mapStatus(o.status || 'em_andamento'),
+        responsavel: o.responsavel || '',
+      }));
+      console.log('Obras fetched from API (mapped):', mapped);
+      setObras(mapped);
+    } catch (error) {
+      console.error('Erro ao buscar obras da API:', error);
+    }
+  }
+
+  // Faz o fetch somente quando o usuário estiver autenticado
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchObras();
+  }, [isAuthenticated]);
+  
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -271,12 +342,12 @@ export default function CadastroObrasPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Responsável Técnico *</label>
+                    <label className="text-sm font-medium">Responsável Técnico</label>
                     <Input
                       placeholder="Ex: Eng. João Carlos Silva"
                       value={formData.responsavel}
                       onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-                      required
+                     
                     />
                   </div>
 
@@ -293,7 +364,7 @@ export default function CadastroObrasPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Descrição</label>
                   <textarea
-                    className="w-full min-h-[80px] p-3 rounded-md border border-input bg-background"
+                    className="w-full min-h-20 p-3 rounded-md border border-input bg-background"
                     placeholder="Descrição detalhada do escopo da obra..."
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -394,8 +465,8 @@ export default function CadastroObrasPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">Período</p>
                         <p className="text-sm font-medium">
-                          {new Date(obra.dataInicio).toLocaleDateString("pt-BR")} até{" "}
-                          {new Date(obra.dataPrevisaoTermino).toLocaleDateString("pt-BR")}
+                          {obra.dataInicio ? new Date(obra.dataInicio).toLocaleDateString("pt-BR") : "-"} até{" "}
+                          {obra.dataPrevisaoTermino ? new Date(obra.dataPrevisaoTermino).toLocaleDateString("pt-BR") : "-"}
                         </p>
                       </div>
                     </div>

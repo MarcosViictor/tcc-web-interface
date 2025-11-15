@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true)
       const response = await authAPI.login(credentials)
+      console.log('Login response:', response)
       
       setUser(response.user)
       setTokens(response.tokens)

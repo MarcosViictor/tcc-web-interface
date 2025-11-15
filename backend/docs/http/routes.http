@@ -1,0 +1,555 @@
+@baseUrl = http://127.0.0.1:8000
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzMzEzMDkzLCJpYXQiOjE3NjMyMjY2OTMsImp0aSI6ImFkYzQwZTczMTc0YTQzN2NhMmZhYzNkMDRlOGJkYWNhIiwidXNlcl9pZCI6MX0.W8lThTdsrTWFR-2ic3ButrKUXkl6XrCg9VGgshP1tMk
+@usuarioId = 00000000-0000-0000-0000-000000000001
+@obraId = 00000000-0000-0000-0000-000000000002
+@equipamentoId = 00000000-0000-0000-0000-000000000003
+@contratoId = 00000000-0000-0000-0000-000000000004
+@criterioId = 00000000-0000-0000-0000-000000000005
+@categoriaId = 00000000-0000-0000-0000-000000000006
+@atividadeId = 00000000-0000-0000-0000-000000000007
+@registroEquipId = 00000000-0000-0000-0000-000000000008
+@registroMaoObraId = 00000000-0000-0000-0000-000000000009
+@atividadeEquipeId = 00000000-0000-0000-0000-000000000010
+@diarioObraId = 00000000-0000-0000-0000-000000000011
+
+### AUTH - Registro
+POST {{baseUrl}}/api/auth/registro
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "matricula": "001234",
+  "nome": "Admin Teste",
+  "cpf": "123.456.789-00",
+  "telefone": "(11) 98888-7777",
+  "tipo_usuario": "admin",
+  "funcao": "engenheiro",
+  "cargo": "Engenheiro Civil",
+  "password": "Senha@123",
+  "password_confirm": "Senha@123"
+}
+
+### AUTH - Login (admin)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Senha@123"
+}
+
+### AUTH - Login (matrícula)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "matricula": "001234",
+  "password": "Senha@123"
+}
+
+### AUTH - Me
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### AUTH - Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "refresh": "REFRESH_TOKEN_AQUI"
+}
+
+### (Opcional legado) GET /auth/perfil
+# GET {{baseUrl}}/auth/perfil
+# Authorization: Bearer {{token}}
+
+### USUÁRIOS - Lista (filtro ?tipo=admin|apontador|encarregado|motorista)
+GET {{baseUrl}}/api/usuarios?tipo=admin
+Authorization: Bearer {{token}}
+
+### USUÁRIOS - Criar
+POST {{baseUrl}}/api/usuarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "novo@example.com",
+  "matricula": "001240",
+  "nome": "Novo Usuário",
+  "cpf": "987.654.321-00",
+  "telefone": "(11) 97777-6666",
+  "tipo_usuario": "motorista",
+  "funcao": "motorista",
+  "cargo": "Motorista",
+  "password": "Senha@123"
+}
+
+### USUÁRIOS - Detalhe
+GET {{baseUrl}}/api/usuarios/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+### USUÁRIOS - Atualizar (PUT)
+PUT {{baseUrl}}/api/usuarios/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Usuário Editado",
+  "telefone": "(11) 90000-0000",
+  "funcao": "motorista",
+  "cargo": "Motorista"
+}
+
+### USUÁRIOS - Atualizar parcial (PATCH)
+PATCH {{baseUrl}}/api/usuarios/{{usuarioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "telefone": "(11) 91111-2222"
+}
+
+### USUÁRIOS - Remover
+DELETE {{baseUrl}}/api/usuarios/{{usuarioId}}
+Authorization: Bearer {{token}}
+
+### OBRAS - Lista (?status=em_andamento, etc. se existir)
+GET {{baseUrl}}/api/obras
+Authorization: Bearer {{token}}
+
+### OBRAS - Criar
+POST {{baseUrl}}/api/obras
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "codigo": "OBR-002",
+  "nome": "Pavimentação BR-101",
+  "local": "BR-101 Trecho Sul",
+  "km_inicial": 10.0,
+  "km_final": 25.0,
+  "data_inicio": "2025-01-01",
+  "data_prevista_fim": "2025-12-31",
+  "status": "em_andamento"
+}
+
+### OBRAS - Detalhe
+GET {{baseUrl}}/api/obras/{{obraId}}
+Authorization: Bearer {{token}}
+
+### OBRAS - Atualizar
+PUT {{baseUrl}}/api/obras/{{obraId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Pavimentação BR-101 - Revisada",
+  "status": "concluida"
+}
+
+### OBRAS - Patch
+PATCH {{baseUrl}}/api/obras/{{obraId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "paralisada"
+}
+
+### OBRAS - Remover
+DELETE {{baseUrl}}/api/obras/{{obraId}}
+Authorization: Bearer {{token}}
+
+### EQUIPAMENTOS - Lista (?obra=ID&status=ativo&tipo=caminhao)
+GET {{baseUrl}}/api/equipamentos?obra={{obraId}}&status=ativo&tipo=caminhao
+Authorization: Bearer {{token}}
+
+### EQUIPAMENTOS - Criar
+POST {{baseUrl}}/api/equipamentos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Caminhão Basculante 001",
+  "tipo": "caminhao",
+  "modelo": "MB 1620",
+  "placa": "ABC-1234",
+  "fabricante": "Mercedes-Benz",
+  "ano": 2020,
+  "horimetro_atual": 1500.5,
+  "status": "ativo",
+  "obra": {{obraId}},
+  "motorista": {{usuarioId}}
+}
+
+### EQUIPAMENTOS - Detalhe
+GET {{baseUrl}}/api/equipamentos/{{equipamentoId}}
+Authorization: Bearer {{token}}
+
+### EQUIPAMENTOS - Atualizar
+PUT {{baseUrl}}/api/equipamentos/{{equipamentoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "manutencao",
+  "horimetro_atual": 1510.7
+}
+
+### EQUIPAMENTOS - Patch
+PATCH {{baseUrl}}/api/equipamentos/{{equipamentoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "inativo"
+}
+
+### EQUIPAMENTOS - Remover
+DELETE {{baseUrl}}/api/equipamentos/{{equipamentoId}}
+Authorization: Bearer {{token}}
+
+### CONTRATOS - Lista (?obra=ID)
+GET {{baseUrl}}/api/contratos?obra={{obraId}}
+Authorization: Bearer {{token}}
+
+### CONTRATOS - Criar (campos exemplo genéricos - ajustar ao serializer)
+POST {{baseUrl}}/api/contratos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numero": "CTR-2025-001",
+  "descricao": "Serviços de terraplenagem",
+  "obra": {{obraId}},
+  "valor_total": 150000.00,
+  "ativo": true
+}
+
+### CONTRATOS - Detalhe
+GET {{baseUrl}}/api/contratos/{{contratoId}}
+Authorization: Bearer {{token}}
+
+### CONTRATOS - Atualizar
+PUT {{baseUrl}}/api/contratos/{{contratoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "descricao": "Serviços de terraplenagem e drenagem",
+  "valor_total": 175000.00
+}
+
+### CONTRATOS - Patch
+PATCH {{baseUrl}}/api/contratos/{{contratoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ativo": false
+}
+
+### CONTRATOS - Remover
+DELETE {{baseUrl}}/api/contratos/{{contratoId}}
+Authorization: Bearer {{token}}
+
+### CRITÉRIOS MEDIÇÃO - Lista (?obra=ID)
+GET {{baseUrl}}/api/criterios-medicao?obra={{obraId}}
+Authorization: Bearer {{token}}
+
+### CRITÉRIOS MEDIÇÃO - Criar (exemplo genérico)
+POST {{baseUrl}}/api/criterios-medicao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "obra": {{obraId}},
+  "descricao": "Medição por volume",
+  "unidade": "m3",
+  "ativo": true
+}
+
+### CRITÉRIOS MEDIÇÃO - Detalhe
+GET {{baseUrl}}/api/criterios-medicao/{{criterioId}}
+Authorization: Bearer {{token}}
+
+### CRITÉRIOS MEDIÇÃO - Atualizar
+PUT {{baseUrl}}/api/criterios-medicao/{{criterioId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "descricao": "Medição por volume compactado"
+}
+
+### CRITÉRIOS MEDIÇÃO - Remover
+DELETE {{baseUrl}}/api/criterios-medicao/{{criterioId}}
+Authorization: Bearer {{token}}
+
+### CATEGORIAS ATIVIDADES - Lista
+GET {{baseUrl}}/api/categorias-atividades
+Authorization: Bearer {{token}}
+
+### CATEGORIAS ATIVIDADES - Criar
+POST {{baseUrl}}/api/categorias-atividades
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Terraplenagem",
+  "descricao": "Atividades de movimentação de terra"
+}
+
+### CATEGORIAS ATIVIDADES - Detalhe
+GET {{baseUrl}}/api/categorias-atividades/{{categoriaId}}
+Authorization: Bearer {{token}}
+
+### CATEGORIAS ATIVIDADES - Atualizar
+PUT {{baseUrl}}/api/categorias-atividades/{{categoriaId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "descricao": "Serviços de corte, aterro e compactação"
+}
+
+### CATEGORIAS ATIVIDADES - Remover
+DELETE {{baseUrl}}/api/categorias-atividades/{{categoriaId}}
+Authorization: Bearer {{token}}
+
+### ATIVIDADES - Lista (?obra=ID&categoria=ID&ativa=true|false)
+GET {{baseUrl}}/api/atividades?obra={{obraId}}&categoria={{categoriaId}}&ativa=true
+Authorization: Bearer {{token}}
+
+### ATIVIDADES - Criar
+POST {{baseUrl}}/api/atividades
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "codigo": "SERV-001",
+  "descricao": "Escavação de vala",
+  "unidade": "m3",
+  "categoria": {{categoriaId}},
+  "preco_unitario": 150.00,
+  "obra": {{obraId}},
+  "ativa": true
+}
+
+### ATIVIDADES - Detalhe
+GET {{baseUrl}}/api/atividades/{{atividadeId}}
+Authorization: Bearer {{token}}
+
+### ATIVIDADES - Atualizar
+PUT {{baseUrl}}/api/atividades/{{atividadeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "descricao": "Escavação e limpeza de vala",
+  "preco_unitario": 160.00
+}
+
+### ATIVIDADES - Patch
+PATCH {{baseUrl}}/api/atividades/{{atividadeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ativa": false
+}
+
+### ATIVIDADES - Remover
+DELETE {{baseUrl}}/api/atividades/{{atividadeId}}
+Authorization: Bearer {{token}}
+
+### REGISTROS EQUIPAMENTOS - Lista (?equipamento=ID&motorista=ID&data=YYYY-MM-DD&validado=true|false)
+GET {{baseUrl}}/api/registros-equipamentos?equipamento={{equipamentoId}}&validado=false
+Authorization: Bearer {{token}}
+
+### REGISTROS EQUIPAMENTOS - Criar
+POST {{baseUrl}}/api/registros-equipamentos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "equipamento": {{equipamentoId}},
+  "motorista": {{usuarioId}},
+  "data": "2025-11-15",
+  "horimetro_inicial": 1500.5,
+  "horimetro_final": 1508.2,
+  "hora_inicio": "08:00",
+  "hora_fim": "17:00",
+  "atividade_principal": "Transporte de material",
+  "local": "KM 15+500",
+  "observacoes": "Tempo bom"
+}
+
+### REGISTROS EQUIPAMENTOS - Detalhe
+GET {{baseUrl}}/api/registros-equipamentos/{{registroEquipId}}
+Authorization: Bearer {{token}}
+
+### REGISTROS EQUIPAMENTOS - Atualizar
+PUT {{baseUrl}}/api/registros-equipamentos/{{registroEquipId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "horimetro_final": 1510.0,
+  "observacoes": "Incluiu deslocamento extra"
+}
+
+### REGISTROS EQUIPAMENTOS - Remover
+DELETE {{baseUrl}}/api/registros-equipamentos/{{registroEquipId}}
+Authorization: Bearer {{token}}
+
+### REGISTROS EQUIPAMENTOS - Validar
+POST {{baseUrl}}/api/registros-equipamentos/{{registroEquipId}}/validar
+Authorization: Bearer {{token}}
+
+### REGISTROS MÃO OBRA - Lista (?obra=ID&apontador=ID&data=YYYY-MM-DD&validado=true|false)
+GET {{baseUrl}}/api/registros-mao-obra?obra={{obraId}}&validado=false
+Authorization: Bearer {{token}}
+
+### REGISTROS MÃO OBRA - Criar
+POST {{baseUrl}}/api/registros-mao-obra
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "apontador": {{usuarioId}},
+  "obra": {{obraId}},
+  "data": "2025-11-15",
+  "total_funcionarios": 4,
+  "hora_inicio": "07:00",
+  "hora_fim": "16:00",
+  "local": "KM 10+000 a KM 12+000",
+  "observacoes": "Dia produtivo",
+  "funcionarios_matriculas": ["001235", "001236"]
+}
+
+### REGISTROS MÃO OBRA - Detalhe
+GET {{baseUrl}}/api/registros-mao-obra/{{registroMaoObraId}}
+Authorization: Bearer {{token}}
+
+### REGISTROS MÃO OBRA - Atualizar
+PUT {{baseUrl}}/api/registros-mao-obra/{{registroMaoObraId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "total_funcionarios": 5,
+  "observacoes": "Entrou reforço"
+}
+
+### REGISTROS MÃO OBRA - Remover
+DELETE {{baseUrl}}/api/registros-mao-obra/{{registroMaoObraId}}
+Authorization: Bearer {{token}}
+
+### REGISTROS MÃO OBRA - Validar
+POST {{baseUrl}}/api/registros-mao-obra/{{registroMaoObraId}}/validar
+Authorization: Bearer {{token}}
+
+### ATIVIDADES EQUIPE - Lista (?obra=ID&encarregado=ID&data=YYYY-MM-DD&status=planejada|em_andamento|concluida)
+GET {{baseUrl}}/api/atividades-equipe?obra={{obraId}}&status=planejada
+Authorization: Bearer {{token}}
+
+### ATIVIDADES EQUIPE - Criar
+POST {{baseUrl}}/api/atividades-equipe
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "obra": {{obraId}},
+  "encarregado": {{usuarioId}},
+  "atividade": {{atividadeId}},
+  "data": "2025-11-15",
+  "status": "planejada",
+  "observacoes": "Iniciar após chegada do material"
+}
+
+### ATIVIDADES EQUIPE - Detalhe
+GET {{baseUrl}}/api/atividades-equipe/{{atividadeEquipeId}}
+Authorization: Bearer {{token}}
+
+### ATIVIDADES EQUIPE - Atualizar
+PUT {{baseUrl}}/api/atividades-equipe/{{atividadeEquipeId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "em_andamento",
+  "observacoes": "Equipe no local"
+}
+
+### ATIVIDADES EQUIPE - Remover
+DELETE {{baseUrl}}/api/atividades-equipe/{{atividadeEquipeId}}
+Authorization: Bearer {{token}}
+
+### DIÁRIOS OBRA - Lista (?obra=ID&encarregado=ID&data=YYYY-MM-DD)
+GET {{baseUrl}}/api/diarios-obra?obra={{obraId}}&data=2025-11-15
+Authorization: Bearer {{token}}
+
+### DIÁRIOS OBRA - Criar
+POST {{baseUrl}}/api/diarios-obra
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "encarregado": {{usuarioId}},
+  "obra": {{obraId}},
+  "data": "2025-11-15",
+  "total_funcionarios": 10,
+  "funcionarios_presentes": 9,
+  "atividades_concluidas": 3,
+  "atividades_parciais": 1,
+  "condicoes_climaticas": "Ensolarado 28°C",
+  "observacoes": "Bom andamento das obras"
+}
+
+### DIÁRIOS OBRA - Detalhe
+GET {{baseUrl}}/api/diarios-obra/{{diarioObraId}}
+Authorization: Bearer {{token}}
+
+### DIÁRIOS OBRA - Atualizar
+PUT {{baseUrl}}/api/diarios-obra/{{diarioObraId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "observacoes": "Adicionada inspeção de segurança"
+}
+
+### DIÁRIOS OBRA - Remover
+DELETE {{baseUrl}}/api/diarios-obra/{{diarioObraId}}
+Authorization: Bearer {{token}}
+
+### DASHBOARD STATS
+GET {{baseUrl}}/api/dashboard/stats
+Authorization: Bearer {{token}}
+
+### IMPORTAR CSV (multipart)
+POST {{baseUrl}}/api/importar-csv
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----CSVBOUNDARY
+
+------CSVBOUNDARY
+Content-Disposition: form-data; name="tipo"
+
+obras
+------CSVBOUNDARY
+Content-Disposition: form-data; name="arquivo"; filename="obras.csv"
+Content-Type: text/csv
+
+codigo,nome,local,km_inicial,km_final,data_inicio,data_prevista_fim,responsavel_email,status
+OBR-002,Recape Rodovia,BR-050,0,5,01/02/2025,30/09/2025,admin@example.com,em_andamento
+------CSVBOUNDARY--
+
+### DOWNLOAD MODELO CSV
+GET {{baseUrl}}/api/modelo-csv/obras
+Authorization: Bearer {{token}}
+
+### EXPORTAR CSV (com filtros opcionais)
+GET {{baseUrl}}/api/exportar-csv/obras?obra={{obraId}}&data_inicio=2025-01-01&data_fim=2025-12-31
+Authorization: Bearer {{token}}
