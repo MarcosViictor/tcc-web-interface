@@ -1,0 +1,6 @@
+nome,tipo,modelo,placa,fabricante,ano,horimetro_atual,status,obra_codigo,motorista_matricula
+Caminhão Basculante 001,caminhao,MB 1620,ABC-1234,Mercedes-Benz,2020,1500.5,ativo,OBR-001,001236
+Escavadeira Hidráulica 001,escavadeira,PC200,XYZ-5678,Komatsu,2021,800.0,ativo,OBR-001,
+Rolo Compactador 001,rolo_compactador,CS54B,DEF-9012,Caterpillar,2019,2300.0,ativo,OBR-001,
+Motoniveladora 001,motoniveladora,120K,GHI-3456,Caterpillar,2022,450.0,ativo,OBR-001,
+Caminhão Pipa 001,caminhao,Volvo FH,JKL-7890,Volvo,2022,500.0,ativo,OBR-002,

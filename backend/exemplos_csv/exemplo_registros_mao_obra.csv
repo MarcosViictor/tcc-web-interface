@@ -1,0 +1,4 @@
+apontador_matricula,obra_codigo,data,total_funcionarios,hora_inicio,hora_fim,local,observacoes,funcionarios_matriculas
+001234,OBR-001,15/11/2025,4,07:00,16:00,KM 10+000 a KM 12+000,Dia produtivo com bom rendimento,001235;001236;001240;001243
+001234,OBR-001,14/11/2025,5,07:00,16:00,KM 12+000 a KM 14+000,Chuva leve à tarde reduziu produtividade,001235;001236;001240;001243;001244
+001242,OBR-002,15/11/2025,3,07:30,16:30,Ponte - KM 45,Trabalho de recuperação estrutural,001241;001244

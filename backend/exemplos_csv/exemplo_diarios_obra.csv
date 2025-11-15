@@ -1,0 +1,4 @@
+encarregado_matricula,obra_codigo,data,total_funcionarios,funcionarios_presentes,atividades_concluidas,atividades_parciais,condicoes_climaticas,observacoes
+001235,OBR-001,15/11/2025,10,9,3,1,Ensolarado temperatura 28°C,Bom andamento das obras. Material recebido conforme programado. Equipamentos operando normalmente.
+001235,OBR-001,14/11/2025,10,10,2,2,Parcialmente nublado com chuva leve à tarde,Produtividade reduzida no período da tarde devido à chuva. Necessário solicitar mais material para próxima semana.
+001241,OBR-002,15/11/2025,5,5,1,1,Ensolarado temperatura 26°C,Trabalhos de recuperação estrutural da ponte em andamento. Inspeção técnica realizada pela manhã.

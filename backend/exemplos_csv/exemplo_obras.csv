@@ -1,0 +1,4 @@
+codigo,nome,local,km_inicial,km_final,data_inicio,data_prevista_fim,responsavel_email,status
+OBR-001,Pavimentação Rodovia BR-101,BR-101 Trecho Sul,10.000,25.000,01/01/2025,31/12/2025,admin@tcc.com,em_andamento
+OBR-002,Recuperação Ponte Rio Grande,KM 45 - BR-101,45.000,45.500,01/03/2025,30/08/2025,,planejamento
+OBR-003,Manutenção BR-050,BR-050 Norte,30.000,45.000,01/12/2025,31/03/2026,admin@tcc.com,planejamento

@@ -1,0 +1,6 @@
+nome,email,matricula,cpf,telefone,tipo_usuario,funcao,cargo,password
+José Silva,,001240,111.222.333-44,(11) 99999-8888,motorista,motorista,Motorista de Caminhão,senha123
+Ana Costa,,001241,222.333.444-55,(11) 99999-7777,encarregado,encarregado,Encarregada de Obras,senha123
+Pedro Santos,,001242,333.444.555-66,(11) 99999-6666,apontador,apontador,Apontador de Produção,senha123
+Maria Oliveira,,001243,444.555.666-77,(11) 99999-5555,motorista,motorista,Motorista de Escavadeira,senha123
+Carlos Pereira,,001244,555.666.777-88,(11) 99999-4444,motorista,operador,Operador de Máquinas,senha123

@@ -1,0 +1,11 @@
+codigo,descricao,unidade,categoria_nome,preco_unitario,obra_codigo,ativa
+TERR-001,Escavação de vala,m3,Terraplenagem,150.00,OBR-001,true
+TERR-002,Aterro compactado,m3,Terraplenagem,120.00,OBR-001,true
+TERR-003,Corte de terreno,m3,Terraplenagem,180.00,OBR-001,true
+PAV-001,Aplicação de CBUQ,m2,Pavimentação,85.00,OBR-001,true
+PAV-002,Imprimação betuminosa,m2,Pavimentação,12.50,OBR-001,true
+PAV-003,Pintura de ligação,m2,Pavimentação,8.00,OBR-001,true
+DREN-001,Instalação de tubos,m,Drenagem,45.50,OBR-001,true
+DREN-002,Caixa coletora,un,Drenagem,350.00,OBR-001,true
+SINAL-001,Placa de sinalização,un,Sinalização,280.00,OBR-001,true
+SINAL-002,Pintura de faixa,m,Sinalização,15.00,OBR-001,true

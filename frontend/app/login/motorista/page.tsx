@@ -4,23 +4,32 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { HardHat, ArrowLeft, Eye, EyeOff, Truck } from "lucide-react"
+import { HardHat, ArrowLeft, Eye, EyeOff, Truck, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function MotoristaLoginPage() {
-  const router = useRouter()
+  const { login, isLoading } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     matricula: "",
     password: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implementar lógica de autenticação com backend
-    // Por enquanto, apenas redireciona para a página de equipamento
-    router.push("/motorista/equipamento")
+    setError("")
+    
+    try {
+      await login({
+        matricula: formData.matricula,
+        password: formData.password,
+      })
+      // O redirecionamento é feito automaticamente pelo AuthContext
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao fazer login")
+    }
   }
 
   return (
@@ -56,6 +65,7 @@ export default function MotoristaLoginPage() {
                   value={formData.matricula}
                   onChange={(e) => setFormData({ ...formData, matricula: e.target.value })}
                   required
+                  disabled={isLoading}
                 />
               </div>
 
@@ -71,6 +81,7 @@ export default function MotoristaLoginPage() {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
+                    disabled={isLoading}
                   />
                   <Button
                     type="button"
@@ -78,6 +89,7 @@ export default function MotoristaLoginPage() {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -88,9 +100,19 @@ export default function MotoristaLoginPage() {
                 </div>
               </div>
 
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive">Erro ao fazer login</p>
+                    <p className="text-sm text-destructive/80 mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded" />
+                  <input type="checkbox" className="rounded" disabled={isLoading} />
                   <span className="text-muted-foreground">Lembrar-me</span>
                 </label>
                 <Link href="#" className="text-success hover:underline">
@@ -98,8 +120,8 @@ export default function MotoristaLoginPage() {
                 </Link>
               </div>
 
-              <Button type="submit" className="w-full bg-success hover:bg-success/90" size="lg">
-                Entrar
+              <Button type="submit" className="w-full bg-success hover:bg-success/90" size="lg" disabled={isLoading}>
+                {isLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 
