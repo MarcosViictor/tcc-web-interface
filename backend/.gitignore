@@ -1,0 +1,60 @@
+# Ambiente virtual
+venv/
+.env/
+*.env
+.env.*
+
+# Configurações sensíveis
+*.pyc
+__pycache__/
+*/__pycache__/
+
+# Cache do Django
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+media/
+staticfiles/
+
+# Migrations (opcional — só ignore se você NÃO quer subir migrations)
+# Descomente caso queira ignorar
+# **/migrations/
+# !**/migrations/__init__.py
+
+# Arquivos de compilação Python
+build/
+dist/
+*.egg-info/
+
+# VSCode e IDEs
+.vscode/
+.idea/
+*.swp
+
+# Arquivos temporários
+*.tmp
+*.bak
+*.orig
+
+# Docker
+docker-compose.override.yml
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Pytest / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Arquivos do pip / cache
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Arquivos de lock opcionais
+*.lock
+
