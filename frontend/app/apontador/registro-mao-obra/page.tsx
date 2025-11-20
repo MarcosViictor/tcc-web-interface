@@ -1,19 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Camera, Save, Users, Plus, X, AlertCircle, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, Camera, Save, Users, Plus, X, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-
-interface Funcionario {
-  matricula: string
-  nome: string
-  presente: boolean
-}
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
+import { ProtectedRoute } from "@/components/ProtectedRoute"
+import { UserHeader } from "@/components/UserHeader"
+import { 
+  obrasAPI,
+  registrosMaoObraAPI,
+  type Obra,
+  type RegistroMaoObra
+} from "@/lib/apontador-api"
 
 interface ServicoExecutado {
   id: string
@@ -23,37 +26,31 @@ interface ServicoExecutado {
   local: string
 }
 
-export default function RegistroMaoObraPage() {
+function RegistroMaoObraContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { tokens, user } = useAuth()
+  
+  const registroId = searchParams.get('registro')
+  
+  const [obras, setObras] = useState<Obra[]>([])
+  const [registro, setRegistro] = useState<RegistroMaoObra | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState("")
+  
   const [formData, setFormData] = useState({
-    encarregado: "Pedro Santos",
-    atividade: "",
+    obra_id: "",
+    funcionarios_matriculas: "", // Separado por vírgula
     dataExecucao: new Date().toISOString().split("T")[0],
     horaInicio: "07:00",
     horaFim: "",
+    local: "",
     observacoes: "",
   })
 
-  const [funcionarios] = useState<Funcionario[]>([
-    { matricula: "001234", nome: "José da Silva", presente: true },
-    { matricula: "001235", nome: "Maria Santos", presente: true },
-    { matricula: "001236", nome: "Pedro Oliveira", presente: true },
-    { matricula: "001237", nome: "Ana Costa", presente: false },
-    { matricula: "001238", nome: "Carlos Mendes", presente: true },
-    { matricula: "001239", nome: "Lucia Ferreira", presente: true },
-  ])
-
-  const [servicosExecutados, setServicosExecutados] = useState<ServicoExecutado[]>([
-    {
-      id: "1",
-      descricao: "Escavação de Vala",
-      unidade: "m³",
-      quantidade: "",
-      local: "",
-    },
-  ])
-
-  const [fotos, setFotos] = useState<string[]>([])
+  const [servicosExecutados, setServicosExecutados] = useState<ServicoExecutado[]>([])
+  const [fotos, setFotos] = useState<File[]>([])
 
   const atividadesDisponiveis = [
     "Escavação de Vala",
@@ -68,17 +65,96 @@ export default function RegistroMaoObraPage() {
 
   const unidadesMedida = ["m³", "m²", "m", "un", "kg", "t"]
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: Enviar dados para o backend
-    const payload = {
-      ...formData,
-      funcionarios: funcionarios.filter((f) => f.presente),
-      servicos: servicosExecutados,
-      fotos,
+  // Carregar dados ao montar
+  useEffect(() => {
+    if (tokens?.access) {
+      loadData()
     }
-    console.log("Dados da mão de obra:", payload)
-    router.push("/apontador/tarefas")
+  }, [tokens, registroId])
+
+  const loadData = async () => {
+    if (!tokens?.access) return
+
+    try {
+      setIsLoading(true)
+      setError("")
+
+      // Buscar obras disponíveis
+      const obrasData = await obrasAPI.listar(tokens.access)
+      setObras(obrasData)
+
+      // Se tem registro ID, carrega registro existente
+      if (registroId) {
+        const registroData = await registrosMaoObraAPI.obter(tokens.access, parseInt(registroId))
+        setRegistro(registroData)
+        
+        // Preenche formulário com dados do registro
+        setFormData({
+          obra_id: registroData.obra.toString(),
+          funcionarios_matriculas: "", // TODO: carregar do registro
+          dataExecucao: registroData.data,
+          horaInicio: registroData.hora_inicio,
+          horaFim: registroData.hora_fim || "",
+          local: registroData.local,
+          observacoes: registroData.observacoes || "",
+        })
+      } else if (obrasData.length > 0) {
+        // Seleciona primeira obra por padrão
+        setFormData(prev => ({ ...prev, obra_id: obrasData[0].id.toString() }))
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+      setError('Erro ao carregar dados.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!tokens?.access || !user?.id) {
+      setError('Usuário não autenticado')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setError("")
+
+      // Conta funcionários (separados por vírgula ou ponto-e-vírgula)
+      const matriculas = formData.funcionarios_matriculas
+        .split(/[,;]/)
+        .map(m => m.trim())
+        .filter(m => m.length > 0)
+
+      const dados = {
+        apontador: user.id,
+        obra: parseInt(formData.obra_id),
+        data: formData.dataExecucao,
+        total_funcionarios: matriculas.length,
+        hora_inicio: formData.horaInicio,
+        hora_fim: formData.horaFim || undefined,
+        local: formData.local,
+        observacoes: formData.observacoes,
+        validado: false
+      }
+
+      if (registro?.id) {
+        // Atualizar registro existente
+        await registrosMaoObraAPI.atualizar(tokens.access, registro.id, dados)
+      } else {
+        // Criar novo registro
+        await registrosMaoObraAPI.criar(tokens.access, dados)
+      }
+
+      router.push("/apontador/tarefas")
+    } catch (err: any) {
+      console.error('Erro ao salvar registro:', err)
+      setError(err.message || 'Erro ao salvar registro. Tente novamente.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const adicionarServico = () => {
@@ -103,8 +179,17 @@ export default function RegistroMaoObraPage() {
   }
 
   const handleFotoCapture = () => {
-    const novaFoto = `foto_${Date.now()}.jpg`
-    setFotos([...fotos, novaFoto])
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.capture = 'environment'
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0]
+      if (file) {
+        setFotos([...fotos, file])
+      }
+    }
+    input.click()
   }
 
   const calcularHorasTrabalhadas = () => {
@@ -123,28 +208,52 @@ export default function RegistroMaoObraPage() {
     return `${horas}h ${minutos}min`
   }
 
-  const funcionariosPresentes = funcionarios.filter((f) => f.presente).length
+  const totalFuncionarios = formData.funcionarios_matriculas
+    .split(/[,;]/)
+    .filter(m => m.trim().length > 0)
+    .length
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <header className="bg-secondary text-secondary-foreground sticky top-0 z-10 shadow-md">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Link href="/apontador/tarefas">
-              <Button variant="ghost" size="sm" className="text-secondary-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold">Registro de Mão de Obra</h1>
-              <p className="text-sm opacity-90">Diário de obras - Serviços executados</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <UserHeader />
 
       <div className="container mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/apontador/tarefas">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold">Registro de Mão de Obra</h1>
+            <p className="text-sm text-muted-foreground">
+              {registro ? 'Editar registro' : 'Novo registro'}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <Card className="mb-4 border-destructive bg-destructive/10">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <p>{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações Gerais */}
           <Card>
@@ -157,14 +266,20 @@ export default function RegistroMaoObraPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Encarregado Responsável</label>
-                  <Input
-                    value={formData.encarregado}
-                    onChange={(e) => setFormData({ ...formData, encarregado: e.target.value })}
+                  <label className="text-sm font-medium">Obra</label>
+                  <select
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    value={formData.obra_id}
+                    onChange={(e) => setFormData({ ...formData, obra_id: e.target.value })}
                     required
-                    disabled
-                    className="bg-muted"
-                  />
+                  >
+                    <option value="">Selecione uma obra</option>
+                    {obras.map((obra) => (
+                      <option key={obra.id} value={obra.id}>
+                        {obra.codigo} - {obra.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -179,63 +294,21 @@ export default function RegistroMaoObraPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Atividade Principal</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {atividadesDisponiveis.map((ativ) => (
-                    <Button
-                      key={ativ}
-                      type="button"
-                      variant={formData.atividade === ativ ? "default" : "outline"}
-                      className="h-auto py-3 text-xs"
-                      onClick={() => setFormData({ ...formData, atividade: ativ })}
-                    >
-                      {ativ}
-                    </Button>
-                  ))}
-                </div>
+                <label className="text-sm font-medium">Matrículas dos Funcionários</label>
+                <Input
+                  placeholder="Ex: 001234, 001235, 001236"
+                  value={formData.funcionarios_matriculas}
+                  onChange={(e) => setFormData({ ...formData, funcionarios_matriculas: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Separe as matrículas por vírgula. Total: {totalFuncionarios} funcionário(s)
+                </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Funcionários Presentes */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Equipe Presente</CardTitle>
-                  <CardDescription>Funcionários alocados nesta atividade</CardDescription>
-                </div>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {funcionariosPresentes} presentes
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {funcionarios.map((func) => (
-                  <div
-                    key={func.matricula}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      func.presente ? "bg-success/5 border-success/20" : "bg-muted"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {func.presente ? (
-                        <CheckCircle2 className="h-5 w-5 text-success" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="font-medium">{func.nome}</p>
-                        <p className="text-sm text-muted-foreground">Mat. {func.matricula}</p>
-                      </div>
-                    </div>
-                    {func.presente && <Badge variant="outline">Presente</Badge>}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Equipe - Removida seção de funcionários mockados */}
 
           {/* Horário de Trabalho */}
           <Card>
@@ -277,102 +350,7 @@ export default function RegistroMaoObraPage() {
             </CardContent>
           </Card>
 
-          {/* Serviços Executados */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Serviços Executados</CardTitle>
-                  <CardDescription>Quantificação dos serviços realizados</CardDescription>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={adicionarServico}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {servicosExecutados.map((servico, index) => (
-                <div key={servico.id} className="p-4 border rounded-lg space-y-3 bg-card">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">Serviço {index + 1}</h4>
-                    {servicosExecutados.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removerServico(servico.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Descrição do Serviço</label>
-                      <Input
-                        placeholder="Ex: Escavação de vala para drenagem"
-                        value={servico.descricao}
-                        onChange={(e) => atualizarServico(servico.id, "descricao", e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Quantidade</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={servico.quantidade}
-                          onChange={(e) => atualizarServico(servico.id, "quantidade", e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Unidade</label>
-                        <select
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                          value={servico.unidade}
-                          onChange={(e) => atualizarServico(servico.id, "unidade", e.target.value)}
-                        >
-                          {unidadesMedida.map((un) => (
-                            <option key={un} value={un}>
-                              {un}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Local/Estaqueamento</label>
-                      <Input
-                        placeholder="Ex: km 45+200 a 45+450"
-                        value={servico.local}
-                        onChange={(e) => atualizarServico(servico.id, "local", e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    {servico.quantidade && servico.unidade && (
-                      <div className="bg-primary/5 p-3 rounded-md">
-                        <p className="text-sm text-center">
-                          <span className="font-semibold text-primary text-lg">
-                            {servico.quantidade} {servico.unidade}
-                          </span>{" "}
-                          <span className="text-muted-foreground">de {servico.descricao}</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {/* Serviços - Removida seção de serviços (não está no modelo backend) */}
 
           {/* Observações */}
           <Card>
@@ -405,8 +383,12 @@ export default function RegistroMaoObraPage() {
               {fotos.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {fotos.map((foto, idx) => (
-                    <div key={idx} className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <Camera className="h-6 w-6 text-muted-foreground" />
+                    <div key={idx} className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+                      <img 
+                        src={URL.createObjectURL(foto)} 
+                        alt={`Foto ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   ))}
                 </div>
@@ -435,17 +417,45 @@ export default function RegistroMaoObraPage() {
           {/* Botões de Ação */}
           <div className="flex gap-3 sticky bottom-4">
             <Link href="/apontador/tarefas" className="flex-1">
-              <Button type="button" variant="outline" className="w-full" size="lg">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                size="lg"
+                disabled={isSaving}
+              >
                 Cancelar
               </Button>
             </Link>
-            <Button type="submit" className="flex-1 bg-secondary hover:bg-secondary/90" size="lg">
-              <Save className="h-4 w-4 mr-2" />
-              Salvar no Diário
+            <Button 
+              type="submit" 
+              className="flex-1 bg-secondary hover:bg-secondary/90" 
+              size="lg"
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {registro ? 'Atualizar Registro' : 'Salvar no Diário'}
+                </>
+              )}
             </Button>
           </div>
         </form>
       </div>
     </div>
+  )
+}
+
+export default function RegistroMaoObraPage() {
+  return (
+    <ProtectedRoute allowedTypes={['apontador', 'encarregado', 'admin']}>
+      <RegistroMaoObraContent />
+    </ProtectedRoute>
   )
 }

@@ -27,6 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# Disable automatic slash appending for API endpoints
+APPEND_SLASH = False
+
 
 # Application definition
 
