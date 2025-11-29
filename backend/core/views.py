@@ -5,6 +5,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from .models import (
     Usuario, Obra, Equipamento, Contrato, CriterioMedicao,
@@ -24,6 +26,16 @@ from .importers import get_importer, CSVImportError
 User = get_user_model()
 
 
+@extend_schema(
+    tags=['Autenticação'],
+    summary='Registro de novo usuário',
+    description='Cria um novo usuário no sistema e retorna tokens JWT',
+    request=RegistroSerializer,
+    responses={
+        201: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT
+    }
+)
 class RegistroView(APIView):
     """
     API para registro de novos usuários
@@ -67,6 +79,16 @@ class RegistroView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Autenticação'],
+    summary='Login de usuário',
+    description='Autentica usuário via email (admin) ou matrícula (outros perfis) e retorna tokens JWT',
+    request=LoginSerializer,
+    responses={
+        200: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT
+    }
+)
 class LoginView(APIView):
     """
     API para login de usuários
@@ -118,6 +140,23 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Autenticação'],
+    summary='Logout de usuário',
+    description='Invalida o refresh token do usuário',
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'refresh': {'type': 'string', 'description': 'Refresh token JWT'}
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Logout realizado com sucesso'},
+        400: {'description': 'Token inválido'}
+    }
+)
 class LogoutView(APIView):
     """
     API para logout de usuários
@@ -146,6 +185,15 @@ class LogoutView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Autenticação'],
+    summary='Dados do usuário logado',
+    description='Retorna informações do usuário autenticado',
+    responses={
+        200: UsuarioSerializer,
+        401: {'description': 'Não autenticado'}
+    }
+)
 class MeView(APIView):
     """
     API para obter dados do usuário logado
@@ -159,6 +207,21 @@ class MeView(APIView):
         return Response(serializer.data)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Usuários'],
+        summary='Listar usuários',
+        description='Lista todos os usuários cadastrados no sistema',
+        parameters=[
+            OpenApiParameter('tipo', OpenApiTypes.STR, description='Filtrar por tipo de usuário (admin, apontador, encarregado, motorista)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Usuários'],
+        summary='Criar usuário',
+        description='Cria um novo usuário no sistema (requer permissão de admin)'
+    )
+)
 class UsuarioListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar usuários (apenas admin)
@@ -180,6 +243,28 @@ class UsuarioListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Usuários'],
+        summary='Detalhes do usuário',
+        description='Obtém informações detalhadas de um usuário específico'
+    ),
+    put=extend_schema(
+        tags=['Usuários'],
+        summary='Atualizar usuário (completo)',
+        description='Atualiza todos os dados de um usuário'
+    ),
+    patch=extend_schema(
+        tags=['Usuários'],
+        summary='Atualizar usuário (parcial)',
+        description='Atualiza parcialmente os dados de um usuário'
+    ),
+    delete=extend_schema(
+        tags=['Usuários'],
+        summary='Excluir usuário',
+        description='Remove um usuário do sistema'
+    )
+)
 class UsuarioDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de usuário
@@ -191,6 +276,18 @@ class UsuarioDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Obras'],
+        summary='Listar obras',
+        description='Lista todas as obras cadastradas no sistema'
+    ),
+    post=extend_schema(
+        tags=['Obras'],
+        summary='Criar obra',
+        description='Cadastra uma nova obra no sistema'
+    )
+)
 class ObraListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar obras
@@ -202,6 +299,28 @@ class ObraListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Obras'],
+        summary='Detalhes da obra',
+        description='Obtém informações detalhadas de uma obra'
+    ),
+    put=extend_schema(
+        tags=['Obras'],
+        summary='Atualizar obra (completo)',
+        description='Atualiza todos os dados de uma obra'
+    ),
+    patch=extend_schema(
+        tags=['Obras'],
+        summary='Atualizar obra (parcial)',
+        description='Atualiza parcialmente os dados de uma obra'
+    ),
+    delete=extend_schema(
+        tags=['Obras'],
+        summary='Excluir obra',
+        description='Remove uma obra do sistema'
+    )
+)
 class ObraDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de obra
@@ -215,6 +334,23 @@ class ObraDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== EQUIPAMENTOS ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Equipamentos'],
+        summary='Listar equipamentos',
+        description='Lista todos os equipamentos cadastrados',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+            OpenApiParameter('status', OpenApiTypes.STR, description='Filtrar por status (ativo, manutencao, inativo)'),
+            OpenApiParameter('tipo', OpenApiTypes.STR, description='Filtrar por tipo de equipamento')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Equipamentos'],
+        summary='Criar equipamento',
+        description='Cadastra um novo equipamento'
+    )
+)
 class EquipamentoListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar equipamentos
@@ -243,6 +379,28 @@ class EquipamentoListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Equipamentos'],
+        summary='Detalhes do equipamento',
+        description='Obtém informações detalhadas de um equipamento'
+    ),
+    put=extend_schema(
+        tags=['Equipamentos'],
+        summary='Atualizar equipamento (completo)',
+        description='Atualiza todos os dados de um equipamento'
+    ),
+    patch=extend_schema(
+        tags=['Equipamentos'],
+        summary='Atualizar equipamento (parcial)',
+        description='Atualiza parcialmente os dados de um equipamento'
+    ),
+    delete=extend_schema(
+        tags=['Equipamentos'],
+        summary='Excluir equipamento',
+        description='Remove um equipamento do sistema'
+    )
+)
 class EquipamentoDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de equipamento
@@ -256,6 +414,21 @@ class EquipamentoDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== CONTRATOS ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Contratos'],
+        summary='Listar contratos',
+        description='Lista todos os contratos cadastrados',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Contratos'],
+        summary='Criar contrato',
+        description='Cadastra um novo contrato'
+    )
+)
 class ContratoListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar contratos
@@ -276,6 +449,28 @@ class ContratoListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Contratos'],
+        summary='Detalhes do contrato',
+        description='Obtém informações detalhadas de um contrato'
+    ),
+    put=extend_schema(
+        tags=['Contratos'],
+        summary='Atualizar contrato (completo)',
+        description='Atualiza todos os dados de um contrato'
+    ),
+    patch=extend_schema(
+        tags=['Contratos'],
+        summary='Atualizar contrato (parcial)',
+        description='Atualiza parcialmente os dados de um contrato'
+    ),
+    delete=extend_schema(
+        tags=['Contratos'],
+        summary='Excluir contrato',
+        description='Remove um contrato do sistema'
+    )
+)
 class ContratoDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de contrato
@@ -289,6 +484,21 @@ class ContratoDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== CRITÉRIOS DE MEDIÇÃO ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Listar critérios de medição',
+        description='Lista todos os critérios de medição cadastrados',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Criar critério de medição',
+        description='Cadastra um novo critério de medição'
+    )
+)
 class CriterioMedicaoListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar critérios de medição
@@ -309,6 +519,28 @@ class CriterioMedicaoListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Detalhes do critério de medição',
+        description='Obtém informações detalhadas de um critério de medição'
+    ),
+    put=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Atualizar critério de medição (completo)',
+        description='Atualiza todos os dados de um critério de medição'
+    ),
+    patch=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Atualizar critério de medição (parcial)',
+        description='Atualiza parcialmente os dados de um critério de medição'
+    ),
+    delete=extend_schema(
+        tags=['Critérios de Medição'],
+        summary='Excluir critério de medição',
+        description='Remove um critério de medição do sistema'
+    )
+)
 class CriterioMedicaoDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de critério de medição
@@ -322,6 +554,18 @@ class CriterioMedicaoDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== CATEGORIAS DE ATIVIDADES ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Listar categorias de atividades',
+        description='Lista todas as categorias de atividades cadastradas'
+    ),
+    post=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Criar categoria de atividade',
+        description='Cadastra uma nova categoria de atividade'
+    )
+)
 class CategoriaAtividadeListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar categorias de atividades
@@ -333,6 +577,28 @@ class CategoriaAtividadeListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Detalhes da categoria de atividade',
+        description='Obtém informações detalhadas de uma categoria de atividade'
+    ),
+    put=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Atualizar categoria de atividade (completo)',
+        description='Atualiza todos os dados de uma categoria de atividade'
+    ),
+    patch=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Atualizar categoria de atividade (parcial)',
+        description='Atualiza parcialmente os dados de uma categoria de atividade'
+    ),
+    delete=extend_schema(
+        tags=['Categorias de Atividades'],
+        summary='Excluir categoria de atividade',
+        description='Remove uma categoria de atividade do sistema'
+    )
+)
 class CategoriaAtividadeDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de categoria de atividade
@@ -346,6 +612,23 @@ class CategoriaAtividadeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== ATIVIDADES ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Atividades'],
+        summary='Listar atividades',
+        description='Lista todas as atividades cadastradas',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+            OpenApiParameter('categoria', OpenApiTypes.INT, description='Filtrar por ID da categoria'),
+            OpenApiParameter('ativa', OpenApiTypes.BOOL, description='Filtrar por atividades ativas (true) ou inativas (false)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Atividades'],
+        summary='Criar atividade',
+        description='Cadastra uma nova atividade'
+    )
+)
 class AtividadeListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar atividades
@@ -373,6 +656,28 @@ class AtividadeListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Atividades'],
+        summary='Detalhes da atividade',
+        description='Obtém informações detalhadas de uma atividade'
+    ),
+    put=extend_schema(
+        tags=['Atividades'],
+        summary='Atualizar atividade (completo)',
+        description='Atualiza todos os dados de uma atividade'
+    ),
+    patch=extend_schema(
+        tags=['Atividades'],
+        summary='Atualizar atividade (parcial)',
+        description='Atualiza parcialmente os dados de uma atividade'
+    ),
+    delete=extend_schema(
+        tags=['Atividades'],
+        summary='Excluir atividade',
+        description='Remove uma atividade do sistema'
+    )
+)
 class AtividadeDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de atividade
@@ -386,6 +691,24 @@ class AtividadeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== REGISTROS DE EQUIPAMENTOS ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Listar registros de equipamentos',
+        description='Lista todos os registros de uso de equipamentos',
+        parameters=[
+            OpenApiParameter('equipamento', OpenApiTypes.INT, description='Filtrar por ID do equipamento'),
+            OpenApiParameter('motorista', OpenApiTypes.INT, description='Filtrar por ID do motorista'),
+            OpenApiParameter('data', OpenApiTypes.DATE, description='Filtrar por data (formato YYYY-MM-DD)'),
+            OpenApiParameter('validado', OpenApiTypes.BOOL, description='Filtrar por registros validados (true) ou não validados (false)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Criar registro de equipamento',
+        description='Cadastra um novo registro de uso de equipamento'
+    )
+)
 class RegistroEquipamentoListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar registros de equipamentos
@@ -416,6 +739,28 @@ class RegistroEquipamentoListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Detalhes do registro de equipamento',
+        description='Obtém informações detalhadas de um registro de equipamento'
+    ),
+    put=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Atualizar registro de equipamento (completo)',
+        description='Atualiza todos os dados de um registro de equipamento'
+    ),
+    patch=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Atualizar registro de equipamento (parcial)',
+        description='Atualiza parcialmente os dados de um registro de equipamento'
+    ),
+    delete=extend_schema(
+        tags=['Registros de Equipamentos'],
+        summary='Excluir registro de equipamento',
+        description='Remove um registro de equipamento do sistema'
+    )
+)
 class RegistroEquipamentoDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de registro de equipamento
@@ -427,6 +772,17 @@ class RegistroEquipamentoDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+@extend_schema(
+    tags=['Registros de Equipamentos'],
+    summary='Validar registro de equipamento',
+    description='Valida um registro de equipamento (somente encarregados e admins)',
+    request=None,
+    responses={
+        200: RegistroEquipamentoSerializer,
+        403: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT
+    }
+)
 class ValidarRegistroEquipamentoView(APIView):
     """
     API para validar um registro de equipamento
@@ -461,6 +817,24 @@ class ValidarRegistroEquipamentoView(APIView):
 
 # ========== REGISTROS DE MÃO DE OBRA ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Listar registros de mão de obra',
+        description='Lista todos os registros de mão de obra',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+            OpenApiParameter('apontador', OpenApiTypes.INT, description='Filtrar por ID do apontador'),
+            OpenApiParameter('data', OpenApiTypes.DATE, description='Filtrar por data (formato YYYY-MM-DD)'),
+            OpenApiParameter('validado', OpenApiTypes.BOOL, description='Filtrar por registros validados (true) ou não validados (false)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Criar registro de mão de obra',
+        description='Cadastra um novo registro de mão de obra'
+    )
+)
 class RegistroMaoObraListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar registros de mão de obra
@@ -491,6 +865,28 @@ class RegistroMaoObraListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Detalhes do registro de mão de obra',
+        description='Obtém informações detalhadas de um registro de mão de obra'
+    ),
+    put=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Atualizar registro de mão de obra (completo)',
+        description='Atualiza todos os dados de um registro de mão de obra'
+    ),
+    patch=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Atualizar registro de mão de obra (parcial)',
+        description='Atualiza parcialmente os dados de um registro de mão de obra'
+    ),
+    delete=extend_schema(
+        tags=['Registros de Mão de Obra'],
+        summary='Excluir registro de mão de obra',
+        description='Remove um registro de mão de obra do sistema'
+    )
+)
 class RegistroMaoObraDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de registro de mão de obra
@@ -502,6 +898,17 @@ class RegistroMaoObraDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+@extend_schema(
+    tags=['Registros de Mão de Obra'],
+    summary='Validar registro de mão de obra',
+    description='Valida um registro de mão de obra (somente encarregados e admins)',
+    request=None,
+    responses={
+        200: RegistroMaoObraSerializer,
+        403: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT
+    }
+)
 class ValidarRegistroMaoObraView(APIView):
     """
     API para validar um registro de mão de obra
@@ -535,6 +942,24 @@ class ValidarRegistroMaoObraView(APIView):
 
 # ========== ATIVIDADES DA EQUIPE ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Listar atividades da equipe',
+        description='Lista todas as atividades atribuídas à equipe',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+            OpenApiParameter('encarregado', OpenApiTypes.INT, description='Filtrar por ID do encarregado'),
+            OpenApiParameter('data', OpenApiTypes.DATE, description='Filtrar por data (formato YYYY-MM-DD)'),
+            OpenApiParameter('status', OpenApiTypes.STR, description='Filtrar por status (pendente, em_andamento, concluida, cancelada)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Criar atividade da equipe',
+        description='Cria uma nova atividade para a equipe'
+    )
+)
 class AtividadeEquipeListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar atividades da equipe
@@ -565,6 +990,28 @@ class AtividadeEquipeListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Detalhes da atividade da equipe',
+        description='Obtém informações detalhadas de uma atividade da equipe'
+    ),
+    put=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Atualizar atividade da equipe (completo)',
+        description='Atualiza todos os dados de uma atividade da equipe'
+    ),
+    patch=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Atualizar atividade da equipe (parcial)',
+        description='Atualiza parcialmente os dados de uma atividade da equipe'
+    ),
+    delete=extend_schema(
+        tags=['Atividades da Equipe'],
+        summary='Excluir atividade da equipe',
+        description='Remove uma atividade da equipe do sistema'
+    )
+)
 class AtividadeEquipeDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de atividade da equipe
@@ -578,6 +1025,23 @@ class AtividadeEquipeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== DIÁRIOS DE OBRA ==========
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Listar diários de obra (RDO)',
+        description='Lista todos os diários de obra (Relatórios Diários de Obra)',
+        parameters=[
+            OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+            OpenApiParameter('encarregado', OpenApiTypes.INT, description='Filtrar por ID do encarregado'),
+            OpenApiParameter('data', OpenApiTypes.DATE, description='Filtrar por data (formato YYYY-MM-DD)')
+        ]
+    ),
+    post=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Criar diário de obra',
+        description='Cria um novo diário de obra (RDO)'
+    )
+)
 class DiarioObraListCreateView(generics.ListCreateAPIView):
     """
     API para listar e criar diários de obra (RDO)
@@ -605,6 +1069,28 @@ class DiarioObraListCreateView(generics.ListCreateAPIView):
         return queryset
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Detalhes do diário de obra',
+        description='Obtém informações detalhadas de um diário de obra'
+    ),
+    put=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Atualizar diário de obra (completo)',
+        description='Atualiza todos os dados de um diário de obra'
+    ),
+    patch=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Atualizar diário de obra (parcial)',
+        description='Atualiza parcialmente os dados de um diário de obra'
+    ),
+    delete=extend_schema(
+        tags=['Diários de Obra'],
+        summary='Excluir diário de obra',
+        description='Remove um diário de obra do sistema'
+    )
+)
 class DiarioObraDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     API para detalhes, edição e exclusão de diário de obra
@@ -618,6 +1104,14 @@ class DiarioObraDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ========== ESTATÍSTICAS/DASHBOARD ==========
 
+@extend_schema(
+    tags=['Dashboard'],
+    summary='Estatísticas do dashboard',
+    description='Retorna estatísticas personalizadas baseadas no tipo de usuário autenticado',
+    responses={
+        200: OpenApiTypes.OBJECT
+    }
+)
 class DashboardStatsView(APIView):
     """
     API para estatísticas do dashboard
@@ -690,6 +1184,26 @@ class DashboardStatsView(APIView):
 
 # ========== IMPORTAÇÃO DE CSV ==========
 
+@extend_schema(
+    tags=['Importação/Exportação'],
+    summary='Importar dados via CSV',
+    description='Importa dados de um arquivo CSV. Tipos: obras, equipamentos, usuarios, atividades, registros_equipamentos, registros_mao_obra, diarios_obra',
+    request={
+        'multipart/form-data': {
+            'type': 'object',
+            'properties': {
+                'tipo': {'type': 'string', 'enum': ['obras', 'equipamentos', 'usuarios', 'atividades', 'registros_equipamentos', 'registros_mao_obra', 'diarios_obra']},
+                'arquivo': {'type': 'string', 'format': 'binary'}
+            }
+        }
+    },
+    responses={
+        200: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT,
+        403: OpenApiTypes.OBJECT,
+        500: OpenApiTypes.OBJECT
+    }
+)
 class ImportarCSVView(APIView):
     """
     API para importar dados de planilhas CSV
@@ -757,6 +1271,19 @@ class ImportarCSVView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=['Importação/Exportação'],
+    summary='Download de modelo CSV',
+    description='Baixa um arquivo CSV modelo para importação de dados',
+    parameters=[
+        OpenApiParameter('tipo', OpenApiTypes.STR, OpenApiParameter.PATH, 
+                        description='Tipo do modelo (obras, equipamentos, usuarios, atividades, registros_equipamentos, registros_mao_obra, diarios_obra)')
+    ],
+    responses={
+        200: OpenApiTypes.BINARY,
+        400: OpenApiTypes.OBJECT
+    }
+)
 class DownloadModeloCSVView(APIView):
     """
     API para baixar modelos de CSV
@@ -817,6 +1344,22 @@ class DownloadModeloCSVView(APIView):
         return response
 
 
+@extend_schema(
+    tags=['Importação/Exportação'],
+    summary='Exportar dados para CSV',
+    description='Exporta dados para um arquivo CSV. Suporta filtros por obra e período',
+    parameters=[
+        OpenApiParameter('tipo', OpenApiTypes.STR, OpenApiParameter.PATH, 
+                        description='Tipo de dados para exportar (obras, equipamentos, registros_equipamentos, registros_mao_obra, diarios_obra)'),
+        OpenApiParameter('obra', OpenApiTypes.INT, description='Filtrar por ID da obra'),
+        OpenApiParameter('data_inicio', OpenApiTypes.DATE, description='Data de início do período (formato YYYY-MM-DD)'),
+        OpenApiParameter('data_fim', OpenApiTypes.DATE, description='Data de fim do período (formato YYYY-MM-DD)')
+    ],
+    responses={
+        200: OpenApiTypes.BINARY,
+        400: OpenApiTypes.OBJECT
+    }
+)
 class ExportarCSVView(APIView):
     """
     API para exportar dados para CSV
