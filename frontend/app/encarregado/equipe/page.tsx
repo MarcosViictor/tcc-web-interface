@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Users, UserCheck, UserX, Search, Plus, CheckCircle2, AlertCircle, FileText } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useUsuariosApi, type UsuarioApi, type PaginatedResponse } from "@/api/UsuariosApi"
 
 interface Funcionario {
   id: number
@@ -19,7 +20,9 @@ interface Funcionario {
 
 export default function EncarregadoEquipe() {
   const router = useRouter()
-  const [searchTerm, setSearchTerm] = useState("")
+  const usuariosApi = useUsuariosApi()
+  const [usuarios, setUsuarios] = useState<UsuarioApi[]>([])
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState<number | null>(null)
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([
     { id: 1, matricula: "001234", nome: "José da Silva", presente: true, atividade: null },
     { id: 2, matricula: "001235", nome: "Maria Santos", presente: true, atividade: null },
@@ -29,6 +32,19 @@ export default function EncarregadoEquipe() {
     { id: 6, matricula: "001239", nome: "Lucia Ferreira", presente: true, atividade: null },
   ])
 
+  useEffect(() => {
+    const loadUsuarios = async () => {
+      try {
+        const resp: PaginatedResponse<UsuarioApi> = await usuariosApi.getUsuarios()
+        const list = Array.isArray((resp as any)) ? (resp as any) : (resp?.results ?? [])
+        setUsuarios(list)
+      } catch (err) {
+        console.error('Erro ao carregar usuários:', err)
+      }
+    }
+    loadUsuarios()
+  }, [])
+
   const togglePresenca = (id: number) => {
     setFuncionarios(funcionarios.map(f => 
       f.id === id ? { ...f, presente: !f.presente } : f
@@ -36,19 +52,24 @@ export default function EncarregadoEquipe() {
   }
 
   const adicionarFuncionario = () => {
-    if (!searchTerm) return
-    
-    // TODO: Buscar funcionário no backend pela matrícula
+    if (!selectedUsuarioId) return
+    const usuario = usuarios.find(u => u.id === selectedUsuarioId)
+    if (!usuario) return
+
     const novoFunc: Funcionario = {
-      id: Date.now(),
-      matricula: searchTerm,
-      nome: "Novo Funcionário", // Virá do backend
+      id: usuario.id,
+      matricula: usuario.matricula,
+      nome: usuario.nome,
       presente: false,
       atividade: null,
     }
-    
-    setFuncionarios([...funcionarios, novoFunc])
-    setSearchTerm("")
+
+    setFuncionarios(prev => {
+      // evita duplicado
+      if (prev.some(f => f.id === novoFunc.id)) return prev
+      return [...prev, novoFunc]
+    })
+    setSelectedUsuarioId(null)
   }
 
   const confirmarApontamento = () => {
@@ -121,18 +142,24 @@ export default function EncarregadoEquipe() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg">Adicionar à Equipe</CardTitle>
-            <CardDescription>Busque por matrícula para adicionar funcionários</CardDescription>
+            <CardDescription>Selecione um usuário cadastrado para adicionar</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Digite a matrícula..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <select
+                  className="w-full h-10 pl-10 rounded-md border border-input bg-background"
+                  value={selectedUsuarioId ?? ''}
+                  onChange={(e) => setSelectedUsuarioId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Selecione um usuário...</option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nome} • Mat: {u.matricula} • Função: {u.funcao}
+                    </option>
+                  ))}
+                </select>
               </div>
               <Button onClick={adicionarFuncionario}>
                 <Plus className="h-4 w-4 mr-2" />

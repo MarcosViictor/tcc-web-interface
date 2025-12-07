@@ -1,5 +1,5 @@
 @baseUrl = http://127.0.0.1:8000
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1MTYyNzExLCJpYXQiOjE3NjUwNzYzMTEsImp0aSI6IjBiN2M5ZmZjYTI2NDRiOGY4MzFmNzQwYmM5MDczMjZmIiwidXNlcl9pZCI6MX0.pWAXf-U20k3EsUweUiRvYZ0vlaH3F0yuCGZwOBag7CE
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1MjA3MjkzLCJpYXQiOjE3NjUxMjA4OTMsImp0aSI6IjNhZDA4OGQ0ZTljNTQwNmZhZDU4MmI5ZmU0ZWFkNGFkIiwidXNlcl9pZCI6MX0.AG9KRBNgNe8kgZKU-nPuKlEeE8guj3so-8d72HikesY
   
 @usuarioId = 00000000-0000-0000-0000-000000000001
 @obraId = 00000000-0000-0000-0000-000000000002
@@ -211,7 +211,7 @@ DELETE {{baseUrl}}/api/equipamentos/1
 Authorization: Bearer {{token}}
 
 ### CONTRATOS - Lista (?obra=ID)
-GET {{baseUrl}}/api/contratos?obra={{obraId}}
+GET {{baseUrl}}/api/contratos
 Authorization: Bearer {{token}}
 
 ### CONTRATOS - Criar (campos exemplo genéricos - ajustar ao serializer)
@@ -220,10 +220,14 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "numero": "CTR-2025-001",
-  "descricao": "Serviços de terraplenagem",
-  "obra": {{obraId}},
-  "valor_total": 150000.00,
+  "fornecedor": "Construtora ABC Ltda",
+  "cnpj": "12.345.678/0001-99",
+  "tipo": "materiais",
+  "numero_contrato": "CONT-2025-001",
+  "valor_mensal": 50000.00,
+  "data_inicio": "2025-01-01",
+  "data_fim": "2025-12-31",
+  "obra": 1,
   "ativo": true
 }
 

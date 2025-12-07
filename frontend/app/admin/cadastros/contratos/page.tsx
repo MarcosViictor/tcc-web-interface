@@ -1,15 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, FileText, Building } from "lucide-react"
 import Link from "next/link"
+import useContratosApi, { Contrato as ContratoApi } from "@/api/ContratosApi"
+import { useObraApi } from "@/api/ObraApi"
 
-interface Contrato {
-  id: string
+interface ContratoUI {
+  id: number
   fornecedor: string
   cnpj: string
   tipo: string
@@ -18,12 +20,16 @@ interface Contrato {
   dataTermino: string
   valorMensal: number
   status: "ativo" | "suspenso" | "encerrado"
-  responsavel: string
 }
 
 export default function CadastroContratosPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const contratosApi = useContratosApi()
+  const obraApi = useObraApi()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     fornecedor: "",
@@ -33,78 +39,132 @@ export default function CadastroContratosPage() {
     dataInicio: "",
     dataTermino: "",
     valorMensal: "",
-    responsavel: "",
     objeto: "",
   })
 
-  const [contratos, setContratos] = useState<Contrato[]>([
-    {
-      id: "1",
-      fornecedor: "Locadora ABC Equipamentos Ltda",
-      cnpj: "12.345.678/0001-90",
-      tipo: "Locação de Equipamentos",
-      numeroContrato: "CONT-2024-001",
-      dataInicio: "2024-01-01",
-      dataTermino: "2024-12-31",
-      valorMensal: 150000,
-      status: "ativo",
-      responsavel: "Eng. João Carlos",
-    },
-    {
-      id: "2",
-      fornecedor: "Transportes XYZ S.A.",
-      cnpj: "98.765.432/0001-10",
-      tipo: "Transporte de Materiais",
-      numeroContrato: "CONT-2024-002",
-      dataInicio: "2024-02-01",
-      dataTermino: "2025-01-31",
-      valorMensal: 80000,
-      status: "ativo",
-      responsavel: "Eng. Maria Oliveira",
-    },
-  ])
+  const [contratos, setContratos] = useState<ContratoUI[]>([])
+  const [obras, setObras] = useState<Array<{ id: number; nome: string }>>([])
+  const [obraId, setObraId] = useState<number | null>(null)
 
   const tiposContrato = [
-    "Locação de Equipamentos",
-    "Transporte de Materiais",
-    "Fornecimento de Agregados",
-    "Mão de Obra Terceirizada",
-    "Serviços de Topografia",
-    "Consultoria Técnica",
-    "Manutenção de Equipamentos",
-    "Fornecimento de Combustível",
+    { value: 'materiais', label: 'Materiais' },
+    { value: 'mao_obra', label: 'Mão de Obra' },
+    { value: 'equipamentos', label: 'Equipamentos' },
+    { value: 'servicos', label: 'Serviços' },
+    { value: 'consultoria', label: 'Consultoria' },
+    { value: 'locacao', label: 'Locação' },
+    { value: 'manutencao', label: 'Manutenção' },
+    { value: 'outros', label: 'Outros' },
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const novoContrato: Contrato = {
-      id: Date.now().toString(),
-      fornecedor: formData.fornecedor,
-      cnpj: formData.cnpj,
-      tipo: formData.tipo,
-      numeroContrato: formData.numeroContrato,
-      dataInicio: formData.dataInicio,
-      dataTermino: formData.dataTermino,
-      valorMensal: parseFloat(formData.valorMensal),
-      status: "ativo",
-      responsavel: formData.responsavel,
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const lista = await contratosApi.listar()
+        const mapped: ContratoUI[] = lista.map((c: ContratoApi) => ({
+          id: c.id,
+          fornecedor: c.fornecedor,
+          cnpj: c.cnpj,
+          tipo: c.tipo,
+          numeroContrato: c.numero_contrato,
+          dataInicio: c.data_inicio,
+          dataTermino: c.data_fim,
+          valorMensal: c.valor_mensal,
+          status: c.ativo ? "ativo" : "encerrado",
+        }))
+        setContratos(mapped)
+        const obrasResp = await obraApi.getObras()
+        const obrasList = Array.isArray(obrasResp)
+          ? obrasResp
+          : (obrasResp?.results || obrasResp?.data || [])
+        const normalized = obrasList.map((o: any) => ({ id: o.id, nome: o.nome }))
+        setObras(normalized)
+        if (normalized.length > 0) setObraId(normalized[0].id)
+      } catch (err: any) {
+        setError(err?.message || "Erro ao carregar contratos")
+      } finally {
+        setLoading(false)
+      }
     }
-    setContratos([...contratos, novoContrato])
-    setFormData({
-      fornecedor: "",
-      cnpj: "",
-      tipo: "",
-      numeroContrato: "",
-      dataInicio: "",
-      dataTermino: "",
-      valorMensal: "",
-      responsavel: "",
-      objeto: "",
-    })
-    setShowForm(false)
+    load()
+  }, [contratosApi])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    try {
+      if (editingId) {
+        const payloadUpdate = {
+          fornecedor: formData.fornecedor,
+          cnpj: formData.cnpj,
+          tipo: formData.tipo as any,
+          numero_contrato: formData.numeroContrato,
+          valor_mensal: parseFloat(formData.valorMensal),
+          data_inicio: formData.dataInicio,
+          data_fim: formData.dataTermino,
+          obra: obraId ?? undefined,
+        }
+        const updated = await contratosApi.atualizar(editingId, payloadUpdate as any)
+        setContratos((prev) => prev.map((c) => c.id === editingId ? {
+          id: updated.id,
+          fornecedor: updated.fornecedor,
+          cnpj: updated.cnpj,
+          tipo: updated.tipo,
+          numeroContrato: updated.numero_contrato,
+          dataInicio: updated.data_inicio,
+          dataTermino: updated.data_fim,
+          valorMensal: updated.valor_mensal,
+          status: updated.ativo ? "ativo" : "encerrado",
+        } : c))
+      } else {
+        const payloadCreate = {
+          fornecedor: formData.fornecedor,
+          cnpj: formData.cnpj,
+          tipo: formData.tipo as any,
+          numero_contrato: formData.numeroContrato,
+          valor_mensal: parseFloat(formData.valorMensal),
+          data_inicio: formData.dataInicio,
+          data_fim: formData.dataTermino,
+          obra: obraId as number,
+          ativo: true,
+        }
+        const created = await contratosApi.criar(payloadCreate as any)
+        const novo: ContratoUI = {
+          id: created.id,
+          fornecedor: created.fornecedor,
+          cnpj: created.cnpj,
+          tipo: created.tipo,
+          numeroContrato: created.numero_contrato,
+          dataInicio: created.data_inicio,
+          dataTermino: created.data_fim,
+          valorMensal: created.valor_mensal,
+          status: created.ativo ? "ativo" : "encerrado",
+        }
+        setContratos((prev) => [novo, ...prev])
+      }
+      setFormData({
+        fornecedor: "",
+        cnpj: "",
+        tipo: "",
+        numeroContrato: "",
+        dataInicio: "",
+        dataTermino: "",
+        valorMensal: "",
+        objeto: "",
+      })
+      setEditingId(null)
+      setShowForm(false)
+    } catch (err: any) {
+      setError(err?.message || "Erro ao cadastrar contrato")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getStatusBadge = (status: Contrato["status"]) => {
+  const getStatusBadge = (status: ContratoUI["status"]) => {
     const variants = {
       ativo: { label: "Ativo", className: "bg-success/10 text-success border-success/30" },
       suspenso: { label: "Suspenso", className: "bg-warning/10 text-warning border-warning/30" },
@@ -117,6 +177,19 @@ export default function CadastroContratosPage() {
     c.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.numeroContrato.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const handleDelete = async (id: number) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await contratosApi.deletar(id)
+      setContratos((prev) => prev.filter((c) => c.id !== id))
+    } catch (err: any) {
+      setError(err?.message || "Erro ao excluir contrato")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -137,6 +210,9 @@ export default function CadastroContratosPage() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {error && (
+          <div className="mb-4 text-sm text-destructive">{error}</div>
+        )}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -194,7 +270,7 @@ export default function CadastroContratosPage() {
                     >
                       <option value="">Selecione...</option>
                       {tiposContrato.map((tipo) => (
-                        <option key={tipo} value={tipo}>{tipo}</option>
+                        <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
                       ))}
                     </select>
                   </div>
@@ -207,6 +283,23 @@ export default function CadastroContratosPage() {
                       onChange={(e) => setFormData({ ...formData, numeroContrato: e.target.value })}
                       required
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Obra *</label>
+                    <select
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      value={obraId ?? ''}
+                      onChange={(e) => setObraId(Number(e.target.value))}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {obras.map((o) => (
+                        <option key={o.id} value={o.id}>{o.nome}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -244,15 +337,7 @@ export default function CadastroContratosPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Responsável pelo Contrato *</label>
-                  <Input
-                    placeholder="Ex: Eng. João Carlos Silva"
-                    value={formData.responsavel}
-                    onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-                    required
-                  />
-                </div>
+          
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Objeto do Contrato</label>
@@ -293,8 +378,27 @@ export default function CadastroContratosPage() {
                     <p className="text-sm text-muted-foreground">CNPJ: {contrato.cnpj}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm"><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="sm" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingId(contrato.id)
+                        setFormData({
+                          fornecedor: contrato.fornecedor,
+                          cnpj: contrato.cnpj,
+                          tipo: contrato.tipo,
+                          numeroContrato: contrato.numeroContrato,
+                          dataInicio: contrato.dataInicio,
+                          dataTermino: contrato.dataTermino,
+                          valorMensal: String(contrato.valorMensal),
+                          objeto: "",
+                        })
+                        setShowForm(true)
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(contrato.id)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
 
