@@ -10,16 +10,18 @@ import { useAuth } from "@/contexts/AuthContext"
 import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { UserHeader } from "@/components/UserHeader"
 import { 
-  equipamentosAPI, 
-  registrosEquipamentoAPI, 
-  registrosMaoObraAPI,
   type Equipamento,
   type RegistroEquipamento,
   type RegistroMaoObra
 } from "@/lib/apontador-api"
+import { useEquipamentosApi } from "@/api/EquipamentosApi"
+import { useMaoDeObraApi } from "@/api/MaoDeObraApi"
+import { APIError } from "@/lib/api"
 
 function ApontadorTarefasContent() {
   const { tokens } = useAuth()
+  const equipamentosApi = useEquipamentosApi()
+  const maoDeObraApi = useMaoDeObraApi()
   
   console.log('🔄 [Tarefas] Componente renderizado!')
   console.log('🔄 [Tarefas] useAuth() retornou:', { tokens })
@@ -55,35 +57,34 @@ function ApontadorTarefasContent() {
       console.log('📡 [Tarefas] Iniciando busca de dados...')
       console.log('📡 [Tarefas] Token:', tokens.access.substring(0, 20) + '...')
 
-      // Buscar equipamentos ativos
-      console.log('🚜 [Tarefas] Buscando equipamentos...')
-      const equipamentosData = await equipamentosAPI.listar(tokens.access, {
-        status: 'ativo'
-      })
-      console.log('✅ [Tarefas] Equipamentos recebidos:', equipamentosData.length, equipamentosData)
-      setEquipamentos(equipamentosData)
+      // Buscar equipamentos (via hook useEquipamentosApi)
+      console.log('🚜 [Tarefas] Buscando equipamentos (hook)...')
+      const equipamentosData = await equipamentosApi.getEquipamentos()
+      const equipamentosList = Array.isArray(equipamentosData)
+        ? equipamentosData
+        : (equipamentosData?.results ?? equipamentosData?.data ?? [])
+      console.log('✅ [Tarefas] Equipamentos recebidos:', equipamentosList.length, equipamentosList)
+      setEquipamentos(equipamentosList as Equipamento[])
 
-      // Buscar registros de equipamento de hoje
-      const hoje = new Date().toISOString().split('T')[0]
-      console.log('📅 [Tarefas] Buscando registros de equipamento para:', hoje)
-      const registrosEquipData = await registrosEquipamentoAPI.listar(tokens.access, {
-        data_inicio: hoje,
-        data_fim: hoje
-      })
-      console.log('✅ [Tarefas] Registros de equipamento:', registrosEquipData.length, registrosEquipData)
-      setRegistrosEquipamento(registrosEquipData)
+      // Registros de equipamento (novo endpoint ainda não definido)
+      console.log('📅 [Tarefas] Registros de equipamento: endpoint novo não definido, deixando vazio')
+      setRegistrosEquipamento([])
 
-      // Buscar registros de mão de obra pendentes
-      console.log('👷 [Tarefas] Buscando registros de mão de obra...')
-      const registrosMaoObraData = await registrosMaoObraAPI.pendentesValidacao(tokens.access)
-      console.log('✅ [Tarefas] Registros de mão de obra:', registrosMaoObraData.length, registrosMaoObraData)
-      setRegistrosMaoObra(registrosMaoObraData)
+      // Registros de mão de obra pendentes de validação (GET via hook)
+      console.log('👷 [Tarefas] Buscando registros de mão de obra pendentes...')
+      const maoObraData = await maoDeObraApi.listar({ validado: false })
+      const maoObraList = Array.isArray(maoObraData)
+        ? maoObraData
+        : (maoObraData?.results ?? maoObraData?.data ?? [])
+      console.log('✅ [Tarefas] Registros de mão de obra recebidos:', maoObraList.length, maoObraList)
+      setRegistrosMaoObra(maoObraList as RegistroMaoObra[])
 
       console.log('🎉 [Tarefas] Todos os dados carregados com sucesso!')
 
     } catch (err) {
       console.error('❌ [Tarefas] Erro ao carregar dados:', err)
-      setError('Erro ao carregar dados. Tente novamente.')
+      const message = err instanceof APIError ? err.message : 'Erro ao carregar dados. Tente novamente.'
+      setError(message)
     } finally {
       setIsLoading(false)
     }

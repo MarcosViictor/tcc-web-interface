@@ -1,5 +1,6 @@
 @baseUrl = http://127.0.0.1:8000
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzMzEzMDkzLCJpYXQiOjE3NjMyMjY2OTMsImp0aSI6ImFkYzQwZTczMTc0YTQzN2NhMmZhYzNkMDRlOGJkYWNhIiwidXNlcl9pZCI6MX0.W8lThTdsrTWFR-2ic3ButrKUXkl6XrCg9VGgshP1tMk
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1MTYyNzExLCJpYXQiOjE3NjUwNzYzMTEsImp0aSI6IjBiN2M5ZmZjYTI2NDRiOGY4MzFmNzQwYmM5MDczMjZmIiwidXNlcl9pZCI6MX0.pWAXf-U20k3EsUweUiRvYZ0vlaH3F0yuCGZwOBag7CE
+  
 @usuarioId = 00000000-0000-0000-0000-000000000001
 @obraId = 00000000-0000-0000-0000-000000000002
 @equipamentoId = 00000000-0000-0000-0000-000000000003
@@ -65,7 +66,7 @@ Content-Type: application/json
 # Authorization: Bearer {{token}}
 
 ### USUÁRIOS - Lista (filtro ?tipo=admin|apontador|encarregado|motorista)
-GET {{baseUrl}}/api/usuarios?tipo=admin
+GET {{baseUrl}}/api/usuarios
 Authorization: Bearer {{token}}
 
 ### USUÁRIOS - Criar
@@ -171,10 +172,10 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "nome": "Caminhão Basculante 001",
+  "nome": "Caminhão Basculante 002",
   "tipo": "caminhao",
   "modelo": "MB 1620",
-  "placa": "ABC-1234",
+  "placa": "ABC-1235",
   "fabricante": "Mercedes-Benz",
   "ano": 2020,
   "horimetro_atual": 1500.5,

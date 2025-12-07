@@ -13,10 +13,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute"
 import { UserHeader } from "@/components/UserHeader"
 import { 
   obrasAPI,
-  registrosMaoObraAPI,
   type Obra,
   type RegistroMaoObra
 } from "@/lib/apontador-api"
+import { useMaoDeObraApi } from "@/api/MaoDeObraApi"
+import { useObraApi } from "@/api/ObraApi"
 
 interface ServicoExecutado {
   id: string
@@ -30,6 +31,8 @@ function RegistroMaoObraContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { tokens, user } = useAuth()
+  const maoDeObraApi = useMaoDeObraApi()
+  const obraApi = useObraApi()
   
   const registroId = searchParams.get('registro')
   
@@ -41,13 +44,18 @@ function RegistroMaoObraContent() {
   
   const [formData, setFormData] = useState({
     obra_id: "",
-    funcionarios_matriculas: "", // Separado por vírgula
-    dataExecucao: new Date().toISOString().split("T")[0],
-    horaInicio: "07:00",
-    horaFim: "",
+    funcionarios_presentes_text: "", // IDs separados por vírgula
+    data: new Date().toISOString().split("T")[0],
+    hora_inicio: "07:00",
+    hora_fim: "",
     local: "",
+    km_inicial: "",
+    km_final: "",
     observacoes: "",
   })
+    
+  // Validações básicas
+  const localTrim = (formData.local || '').trim()
 
   const [servicosExecutados, setServicosExecutados] = useState<ServicoExecutado[]>([])
   const [fotos, setFotos] = useState<File[]>([])
@@ -80,27 +88,19 @@ function RegistroMaoObraContent() {
       setError("")
 
       // Buscar obras disponíveis
-      const obrasData = await obrasAPI.listar(tokens.access)
-      setObras(obrasData)
+      const obrasData = await obraApi.getObras()
+      const obrasList = Array.isArray(obrasData)
+        ? obrasData
+        : (obrasData?.results ?? obrasData?.data ?? [])
+      setObras(obrasList)
 
       // Se tem registro ID, carrega registro existente
       if (registroId) {
-        const registroData = await registrosMaoObraAPI.obter(tokens.access, parseInt(registroId))
-        setRegistro(registroData)
-        
-        // Preenche formulário com dados do registro
-        setFormData({
-          obra_id: registroData.obra.toString(),
-          funcionarios_matriculas: "", // TODO: carregar do registro
-          dataExecucao: registroData.data,
-          horaInicio: registroData.hora_inicio,
-          horaFim: registroData.hora_fim || "",
-          local: registroData.local,
-          observacoes: registroData.observacoes || "",
-        })
-      } else if (obrasData.length > 0) {
+        // Se no futuro precisarmos editar, buscar e preencher aqui
+      } else if ((Array.isArray(obrasData) ? obrasData : obrasList).length > 0) {
         // Seleciona primeira obra por padrão
-        setFormData(prev => ({ ...prev, obra_id: obrasData[0].id.toString() }))
+        const arr = Array.isArray(obrasData) ? obrasData : obrasList
+        setFormData(prev => ({ ...prev, obra_id: arr[0].id.toString() }))
       }
     } catch (err) {
       console.error('Erro ao carregar dados:', err)
@@ -122,31 +122,35 @@ function RegistroMaoObraContent() {
       setIsSaving(true)
       setError("")
 
-      // Conta funcionários (separados por vírgula ou ponto-e-vírgula)
-      const matriculas = formData.funcionarios_matriculas
+      if (!localTrim) {
+        setError('O campo Local é obrigatório.')
+        setIsSaving(false)
+        return
+      }
+
+      // IDs de funcionários presentes (separados por vírgula ou ponto-e-vírgula)
+      const funcionarios_presentes = formData.funcionarios_presentes_text
         .split(/[,;]/)
         .map(m => m.trim())
         .filter(m => m.length > 0)
+        .map(n => Number(n))
+        .filter(n => !Number.isNaN(n))
 
       const dados = {
         apontador: user.id,
         obra: parseInt(formData.obra_id),
-        data: formData.dataExecucao,
-        total_funcionarios: matriculas.length,
-        hora_inicio: formData.horaInicio,
-        hora_fim: formData.horaFim || undefined,
-        local: formData.local,
+        data: formData.data,
+        funcionarios_presentes,
+        total_funcionarios: funcionarios_presentes.length,
+        hora_inicio: formData.hora_inicio,
+        hora_fim: formData.hora_fim || "",
+        local: localTrim,
         observacoes: formData.observacoes,
-        validado: false
+        fotos: [],
       }
 
-      if (registro?.id) {
-        // Atualizar registro existente
-        await registrosMaoObraAPI.atualizar(tokens.access, registro.id, dados)
-      } else {
-        // Criar novo registro
-        await registrosMaoObraAPI.criar(tokens.access, dados)
-      }
+      // Criar novo registro
+      await maoDeObraApi.criar(dados)
 
       router.push("/apontador/tarefas")
     } catch (err: any) {
@@ -192,11 +196,31 @@ function RegistroMaoObraContent() {
     input.click()
   }
 
-  const calcularHorasTrabalhadas = () => {
-    if (!formData.horaInicio || !formData.horaFim) return "0:00"
+  // Formata km no padrão "KM 10+000"
+  const formatKm = (value: string) => {
+    const v = value.replace(/[^0-9]/g, '')
+    if (!v) return ''
+    // Assume 5 ou 6 dígitos: ex 10000 -> KM 10+000, 12000 -> KM 12+000
+    const num = parseInt(v, 10)
+    const km = Math.floor(num / 1000)
+    const metros = num % 1000
+    return `KM ${km}+${metros.toString().padStart(3, '0')}`
+  }
 
-    const [hi, mi] = formData.horaInicio.split(":").map(Number)
-    const [hf, mf] = formData.horaFim.split(":").map(Number)
+  // Atualiza o campo local automaticamente quando km_inicial/km_final mudam
+  useEffect(() => {
+    const ini = formatKm(formData.km_inicial)
+    const fim = formatKm(formData.km_final)
+    if (ini && fim) {
+      setFormData(prev => ({ ...prev, local: `${ini} a ${fim}` }))
+    }
+  }, [formData.km_inicial, formData.km_final])
+
+  const calcularHorasTrabalhadas = () => {
+    if (!formData.hora_inicio || !formData.hora_fim) return "0:00"
+
+    const [hi, mi] = formData.hora_inicio.split(":").map(Number)
+    const [hf, mf] = formData.hora_fim.split(":").map(Number)
 
     const inicio = hi * 60 + mi
     const fim = hf * 60 + mf
@@ -208,7 +232,7 @@ function RegistroMaoObraContent() {
     return `${horas}h ${minutos}min`
   }
 
-  const totalFuncionarios = formData.funcionarios_matriculas
+  const totalFuncionarios = formData.funcionarios_presentes_text
     .split(/[,;]/)
     .filter(m => m.trim().length > 0)
     .length
@@ -283,22 +307,22 @@ function RegistroMaoObraContent() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Data de Execução</label>
+                    <label className="text-sm font-medium">Data</label>
                   <Input
                     type="date"
-                    value={formData.dataExecucao}
-                    onChange={(e) => setFormData({ ...formData, dataExecucao: e.target.value })}
+                    value={formData.data}
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Matrículas dos Funcionários</label>
+                <label className="text-sm font-medium">IDs dos Funcionários Presentes</label>
                 <Input
-                  placeholder="Ex: 001234, 001235, 001236"
-                  value={formData.funcionarios_matriculas}
-                  onChange={(e) => setFormData({ ...formData, funcionarios_matriculas: e.target.value })}
+                  placeholder="Ex: 4, 5, 6"
+                  value={formData.funcionarios_presentes_text}
+                  onChange={(e) => setFormData({ ...formData, funcionarios_presentes_text: e.target.value })}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
@@ -322,8 +346,8 @@ function RegistroMaoObraContent() {
                   <label className="text-sm font-medium">Hora Início</label>
                   <Input
                     type="time"
-                    value={formData.horaInicio}
-                    onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
+                    value={formData.hora_inicio}
+                    onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
                     required
                   />
                 </div>
@@ -332,14 +356,14 @@ function RegistroMaoObraContent() {
                   <label className="text-sm font-medium">Hora Fim</label>
                   <Input
                     type="time"
-                    value={formData.horaFim}
-                    onChange={(e) => setFormData({ ...formData, horaFim: e.target.value })}
+                    value={formData.hora_fim}
+                    onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
                     required
                   />
                 </div>
               </div>
 
-              {formData.horaInicio && formData.horaFim && (
+              {formData.hora_inicio && formData.hora_fim && (
                 <div className="bg-accent/5 p-4 rounded-lg border border-accent/20">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Tempo Trabalhado:</span>
@@ -359,6 +383,16 @@ function RegistroMaoObraContent() {
               <CardDescription>Informações complementares sobre a execução</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="space-y-2 mb-4">
+                <label className="text-sm font-medium">Local</label>
+                <Input
+                  placeholder="KM 10+000 a KM 12+000"
+                  value={formData.local}
+                  onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">Preencha manualmente ou use os campos KM Inicial/Final acima.</p>
+              </div>
               <textarea
                 className="w-full min-h-[100px] p-3 rounded-md border border-input bg-background"
                 placeholder="Condições climáticas, dificuldades encontradas, materiais utilizados, etc..."
@@ -394,7 +428,7 @@ function RegistroMaoObraContent() {
                 </div>
               )}
 
-              <p className="text-sm text-muted-foreground">{fotos.length} foto(s) capturada(s)</p>
+              <p className="text-sm text-muted-foreground">{fotos.length} foto(s) capturada(s) (não enviadas)</p>
             </CardContent>
           </Card>
 

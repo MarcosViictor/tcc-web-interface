@@ -1,177 +1,228 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, Users, Upload, Download, User } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
+import { useUsuariosApi, UsuarioApi } from "@/api/UsuariosApi"
+import { useRouter } from "next/navigation"
 
 interface Funcionario {
   id: string
   matricula: string
   nome: string
   funcao: string
+  tipoUsuario?: "admin" | "apontador" | "encarregado" | "motorista"
   cargo: string
   email: string
   telefone: string
+  cpf?: string
   dataAdmissao: string
   status: "ativo" | "ferias" | "afastado" | "desligado"
+  
+
 }
 
 export default function CadastroFuncionariosPage() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const { getUsuarios, createUsuario, updateUsuario, deleteUsuario } = useUsuariosApi()
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editingFunc, setEditingFunc] = useState<Funcionario | null>(null)
+  const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     matricula: "",
     nome: "",
     cpf: "",
     funcao: "",
+    tipoUsuario: "apontador" as "admin" | "apontador" | "encarregado" | "motorista",
     cargo: "",
     email: "",
     telefone: "",
     dataAdmissao: "",
-    endereco: "",
-    cidade: "",
-    estado: "",
+    password: "",
+    passwordConfirm: "",
   })
 
-  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([
-    {
-      id: "1",
-      matricula: "001234",
-      nome: "José da Silva",
-      funcao: "Servente",
-      cargo: "Operacional",
-      email: "jose.silva@empresa.com",
-      telefone: "(88) 99999-0001",
-      dataAdmissao: "2024-01-15",
-      status: "ativo",
-    },
-    {
-      id: "2",
-      matricula: "001235",
-      nome: "Maria Santos",
-      funcao: "Pedreiro",
-      cargo: "Operacional",
-      email: "maria.santos@empresa.com",
-      telefone: "(88) 99999-0002",
-      dataAdmissao: "2024-02-20",
-      status: "ativo",
-    },
-    {
-      id: "3",
-      matricula: "001236",
-      nome: "Pedro Oliveira",
-      funcao: "Operador de Máquinas",
-      cargo: "Operacional",
-      email: "pedro.oliveira@empresa.com",
-      telefone: "(88) 99999-0003",
-      dataAdmissao: "2023-11-10",
-      status: "ativo",
-    },
-    {
-      id: "4",
-      matricula: "001237",
-      nome: "Ana Costa",
-      funcao: "Carpinteiro",
-      cargo: "Operacional",
-      email: "ana.costa@empresa.com",
-      telefone: "(88) 99999-0004",
-      dataAdmissao: "2024-03-05",
-      status: "ferias",
-    },
-  ])
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
+  const loadOnceRef = useRef(false)
 
-  const funcoes = [
-    "Servente",
-    "Pedreiro",
-    "Carpinteiro",
-    "Armador",
-    "Operador de Máquinas",
-    "Motorista",
-    "Mecânico",
-    "Eletricista",
-    "Encanador",
-    "Pintor",
-    "Mestre de Obras",
-    "Encarregado",
-  ]
+  const TIPO_USUARIO_CHOICES = [
+    { value: "admin", label: "Administrador" },
+    { value: "apontador", label: "Apontador" },
+    { value: "encarregado", label: "Encarregado" },
+    { value: "motorista", label: "Motorista" },
+  ] as const
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const FUNCAO_CHOICES = [
+    { value: "engenheiro", label: "Engenheiro" },
+    { value: "tecnico", label: "Técnico" },
+    { value: "encarregado", label: "Encarregado" },
+    { value: "apontador", label: "Apontador" },
+    { value: "motorista", label: "Motorista" },
+    { value: "operador", label: "Operador de Equipamento" },
+    { value: "servente", label: "Servente" },
+    { value: "pedreiro", label: "Pedreiro" },
+    { value: "armador", label: "Armador" },
+    { value: "carpinteiro", label: "Carpinteiro" },
+    { value: "eletricista", label: "Eletricista" },
+    { value: "mecanico", label: "Mecânico" },
+  ] as const
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (editingFunc) {
-      setFuncionarios(funcionarios.map(func => 
-        func.id === editingFunc.id 
-          ? { 
-              ...func, 
-              matricula: formData.matricula,
-              nome: formData.nome,
-              funcao: formData.funcao,
-              cargo: formData.cargo,
-              email: formData.email,
-              telefone: formData.telefone,
-              dataAdmissao: formData.dataAdmissao,
-            }
-          : func
-      ))
-    } else {
-      const novoFunc: Funcionario = {
-        id: Date.now().toString(),
-        matricula: formData.matricula,
-        nome: formData.nome,
-        funcao: formData.funcao,
-        cargo: formData.cargo,
-        email: formData.email,
-        telefone: formData.telefone,
-        dataAdmissao: formData.dataAdmissao,
-        status: "ativo",
+    try {
+      setError(null)
+      // validação de senha
+      if (editingFunc) {
+        const hasPasswordChange = !!formData.password || !!formData.passwordConfirm
+        if (hasPasswordChange) {
+          if (!formData.password || !formData.passwordConfirm) {
+            setError("Para alterar a senha, preencha os dois campos.")
+            return
+          }
+          if (formData.password !== formData.passwordConfirm) {
+            setError("As senhas não coincidem.")
+            return
+          }
+        }
+      } else {
+        // criação exige senha e confirmação
+        if (!formData.password || !formData.passwordConfirm) {
+          setError("Informe a senha e a confirmação para criar o usuário.")
+          return
+        }
+        if (formData.password !== formData.passwordConfirm) {
+          setError("As senhas não coincidem.")
+          return
+        }
       }
-      setFuncionarios([...funcionarios, novoFunc])
+      if (editingFunc) {
+        const updated = await updateUsuario(Number(editingFunc.id), {
+          nome: formData.nome,
+          telefone: formData.telefone,
+          cargo: formData.cargo,
+          funcao: formData.funcao,
+          email: formData.email,
+          tipo_usuario: formData.tipoUsuario,
+          matricula: formData.matricula,
+          cpf: formData.cpf,
+          ...(formData.password ? { password: formData.password } : {}),
+          ...(formData.passwordConfirm ? { password_confirm: formData.passwordConfirm } : {}),
+        })
+        setFuncionarios(prev => prev.map(f => f.id === String(updated.id) ? fromApiToFuncionario(updated) : f))
+      } else {
+        const created = await createUsuario({
+          nome: formData.nome,
+          email: formData.email,
+          matricula: formData.matricula,
+          cpf: formData.cpf,
+          telefone: formData.telefone,
+          funcao: formData.funcao,
+          cargo: formData.cargo,
+          tipo_usuario: formData.tipoUsuario,
+          password: formData.password,
+          password_confirm: formData.passwordConfirm,
+        })
+        setFuncionarios(prev => [fromApiToFuncionario(created), ...prev])
+      }
+
+      setFormData({
+        matricula: "",
+        nome: "",
+        cpf: "",
+        funcao: "",
+        tipoUsuario: "apontador",
+        cargo: "",
+        email: "",
+        telefone: "",
+        dataAdmissao: "",
+        password: "",
+        passwordConfirm: "",
+      })
+      setShowForm(false)
+      setEditingFunc(null)
+    } catch (err: any) {
+      console.error("Erro ao salvar usuário:", err)
+      setError("Erro ao salvar usuário. Verifique os dados e tente novamente.")
     }
-    
-    setFormData({
-      matricula: "",
-      nome: "",
-      cpf: "",
-      funcao: "",
-      cargo: "",
-      email: "",
-      telefone: "",
-      dataAdmissao: "",
-      endereco: "",
-      cidade: "",
-      estado: "",
-    })
-    setShowForm(false)
-    setEditingFunc(null)
   }
+
+  function fromApiToFuncionario(u: UsuarioApi): Funcionario {
+    return {
+      id: String(u.id),
+      matricula: u.matricula || "",
+      nome: u.nome || u.email || "",
+      funcao: u.funcao || u.tipo_usuario || "",
+      tipoUsuario: (u.tipo_usuario as any) ?? undefined,
+      cargo: u.cargo || "",
+      email: u.email || "",
+      telefone: u.telefone || "",
+      cpf: u.cpf || "",
+      dataAdmissao: u.created_at ? new Date(u.created_at).toISOString().slice(0, 10) : "",
+      status: "ativo",
+    }
+  }
+
+  useEffect(() => {
+    if (isLoading) return
+
+    if (!isAuthenticated) {
+      router.push("/login")
+      return
+    }
+
+    const fetchUsuarios = async () => {
+      try {
+        setError(null)
+        const res = await getUsuarios()
+        const mapped = res.results.map(fromApiToFuncionario)
+        setFuncionarios(mapped)
+      } catch (err: any) {
+        console.error("Erro ao carregar usuários:", err)
+        setError("Erro ao carregar funcionários. Tente novamente.")
+      } 
+    }
+
+    // Garante que só carregue uma vez após autenticação pronta
+    if (!loadOnceRef.current) {
+      loadOnceRef.current = true
+      fetchUsuarios()
+    }
+  }, [isAuthenticated, isLoading])
 
   const handleEdit = (func: Funcionario) => {
     setEditingFunc(func)
     setFormData({
       matricula: func.matricula,
       nome: func.nome,
-      cpf: "",
+      cpf: func.cpf || "",
       funcao: func.funcao,
+      tipoUsuario: func.tipoUsuario ?? "apontador",
       cargo: func.cargo,
       email: func.email,
       telefone: func.telefone,
       dataAdmissao: func.dataAdmissao,
-      endereco: "",
-      cidade: "",
-      estado: "",
+      password: "",
+      passwordConfirm: "",
     })
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este funcionário?")) {
-      setFuncionarios(funcionarios.filter(f => f.id !== id))
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este funcionário?")) return
+    try {
+      await deleteUsuario(Number(id))
+      setFuncionarios(prev => prev.filter(f => f.id !== id))
+    } catch (err: any) {
+      console.error("Erro ao excluir usuário:", err)
+      setError("Erro ao excluir usuário. Tente novamente.")
     }
   }
 
@@ -287,8 +338,8 @@ export default function CadastroFuncionariosPage() {
                       required
                     >
                       <option value="">Selecione...</option>
-                      {funcoes.map((funcao) => (
-                        <option key={funcao} value={funcao}>{funcao}</option>
+                      {FUNCAO_CHOICES.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
                   </div>
@@ -300,6 +351,23 @@ export default function CadastroFuncionariosPage() {
                       value={formData.cargo}
                       onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tipo de Usuário *</label>
+                    <select
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      value={formData.tipoUsuario}
+                      onChange={(e) => setFormData({ ...formData, tipoUsuario: e.target.value as any })}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {TIPO_USUARIO_CHOICES.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -324,6 +392,27 @@ export default function CadastroFuncionariosPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Senha {editingFunc ? "(opcional)" : "*"}</label>
+                    <Input
+                      type="password"
+                      placeholder={editingFunc ? "Deixe em branco para não alterar" : "Informe a senha"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Confirmar Senha {editingFunc ? "(opcional)" : "*"}</label>
+                    <Input
+                      type="password"
+                      placeholder={editingFunc ? "Deixe em branco para não alterar" : "Repita a senha"}
+                      value={formData.passwordConfirm}
+                      onChange={(e) => setFormData({ ...formData, passwordConfirm: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Data de Admissão *</label>
@@ -335,34 +424,9 @@ export default function CadastroFuncionariosPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Cidade</label>
-                    <Input
-                      placeholder="Ex: Juazeiro do Norte"
-                      value={formData.cidade}
-                      onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Estado</label>
-                    <Input
-                      placeholder="Ex: CE"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      maxLength={2}
-                    />
-                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Endereço</label>
-                  <Input
-                    placeholder="Rua, número, bairro"
-                    value={formData.endereco}
-                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                  />
-                </div>
+          
 
                 <div className="flex gap-3">
                   <Button

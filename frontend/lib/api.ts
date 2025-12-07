@@ -55,37 +55,58 @@ export class APIError extends Error {
 // Função auxiliar para fazer requisições
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`
-  
+  const timeoutMs = (options as any).timeout ?? 8000
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
   const config: RequestInit = {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    signal: controller.signal,
   }
 
   try {
     const response = await fetch(url, config)
-    
-    // Se não houver conteúdo (204), retorna null
+    clearTimeout(timeout)
+
     if (response.status === 204) {
       return null
     }
 
-    const data = await response.json()
+    // Tenta ler JSON; se falhar, cria erro genérico com texto
+    let data: any = null
+    const text = await response.text()
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {
+      data = { message: text }
+    }
 
     if (!response.ok) {
       throw new APIError(
         response.status,
-        data.detail || data.message || 'Erro na requisição',
+        (data && (data.detail || data.message)) || `Erro na requisição (${response.status})`,
         data
       )
     }
 
     return data
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeout)
     if (error instanceof APIError) {
       throw error
+    }
+    // AbortError indica timeout
+    if (error?.name === 'AbortError') {
+      throw new APIError(0, `Timeout ao conectar em ${url}`)
+    }
+    // TypeError normalmente indica falha de rede/fetch
+    if (error instanceof TypeError) {
+      throw new APIError(0, `Erro de conexão com o servidor: ${url}`)
     }
     throw new APIError(0, 'Erro de conexão com o servidor')
   }
