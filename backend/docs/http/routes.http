@@ -258,8 +258,8 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/contratos/{{contratoId}}
 Authorization: Bearer {{token}}
 
-### CRITÉRIOS MEDIÇÃO - Lista (?obra=ID)
-GET {{baseUrl}}/api/criterios-medicao?obra={{obraId}}
+### CRITÉRIOS MEDIÇÃO - Lista
+GET {{baseUrl}}/api/criterios-medicao
 Authorization: Bearer {{token}}
 
 ### CRITÉRIOS MEDIÇÃO - Criar (exemplo genérico)

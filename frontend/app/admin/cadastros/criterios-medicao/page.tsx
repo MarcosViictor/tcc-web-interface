@@ -1,26 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Search, Edit, Trash2, Calculator, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import useCriteriosMedicaoApi, { CriterioMedicao } from "@/api/CriteriosMedicaoApi"
+import { useObraApi } from "@/api/ObraApi"
+import { useAuth } from "@/contexts/AuthContext"
 
-interface Criterio {
-  id: string
+interface CriterioUI {
+  id: number
   nome: string
   tipo: "desconto" | "acrescimo" | "regra"
   percentual?: number
   condicao: string
   aplicacao: string
   ativo: boolean
+  obra: number
 }
 
 export default function CriteriosMedicaoPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const criteriosApi = useCriteriosMedicaoApi()
+  const obraApi = useObraApi()
+  const { tokens } = useAuth()
   
   const [formData, setFormData] = useState({
     nome: "",
@@ -31,75 +41,164 @@ export default function CriteriosMedicaoPage() {
     descricao: "",
   })
 
-  const [criterios, setCriterios] = useState<Criterio[]>([
-    {
-      id: "1",
-      nome: "Desconto por Atraso",
-      tipo: "desconto",
-      percentual: 5,
-      condicao: "Atraso > 5 dias",
-      aplicacao: "Contratos de Locação",
-      ativo: true,
-    },
-    {
-      id: "2",
-      nome: "Desconto por Disponibilidade Mecânica Baixa",
-      tipo: "desconto",
-      percentual: 10,
-      condicao: "Disponibilidade < 85%",
-      aplicacao: "Equipamentos Locados",
-      ativo: true,
-    },
-    {
-      id: "3",
-      nome: "Bonificação por Produtividade",
-      tipo: "acrescimo",
-      percentual: 3,
-      condicao: "Meta > 110%",
-      aplicacao: "Mão de Obra Própria",
-      ativo: false,
-    },
-    {
-      id: "4",
-      nome: "Horário Adicional (Noturno)",
-      tipo: "acrescimo",
-      percentual: 25,
-      condicao: "Trabalho entre 22h e 6h",
-      aplicacao: "Todas as Atividades",
-      ativo: true,
-    },
-  ])
+  const [criterios, setCriterios] = useState<CriterioUI[]>([])
+  const [obras, setObras] = useState<Array<{ id: number; nome: string }>>([])
+  const [obraId, setObraId] = useState<number | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const novoCriterio: Criterio = {
-      id: Date.now().toString(),
-      nome: formData.nome,
-      tipo: formData.tipo as "desconto" | "acrescimo" | "regra",
-      percentual: parseFloat(formData.percentual),
-      condicao: formData.condicao,
-      aplicacao: formData.aplicacao,
-      ativo: true,
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        if (!tokens?.access) {
+          setError('Faça login para visualizar e gerenciar critérios.')
+          return
+        }
+        // Listar critérios
+        const lista = await criteriosApi.listar()
+        const mapped: CriterioUI[] = lista.map((c: CriterioMedicao) => ({
+          id: c.id,
+          nome: c.nome,
+          tipo: (c.tipo as any) ?? 'desconto',
+          percentual: c.percentual,
+          condicao: c.condicao || '',
+          aplicacao: c.aplicacao || '',
+          ativo: !!c.ativo,
+          obra: c.obra,
+        }))
+        if (!isMounted) return
+        setCriterios(mapped)
+        // Listar obras para o select
+        const obrasResp = await obraApi.getObras()
+        const obrasList = Array.isArray(obrasResp) ? obrasResp : (obrasResp?.results || obrasResp?.data || [])
+        const normalized = obrasList.map((o: any) => ({ id: o.id, nome: o.nome }))
+        if (!isMounted) return
+        setObras(normalized)
+        if (normalized.length > 0) setObraId(normalized[0].id)
+      } catch (err: any) {
+        setError(err?.message || 'Erro ao carregar critérios/obras')
+      } finally {
+        if (isMounted) setLoading(false)
+      }
     }
-    setCriterios([...criterios, novoCriterio])
-    setFormData({
-      nome: "",
-      tipo: "desconto",
-      percentual: "",
-      condicao: "",
-      aplicacao: "",
-      descricao: "",
-    })
-    setShowForm(false)
+    load()
+    return () => { isMounted = false }
+  }, [tokens?.access])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!obraId) {
+      setError('Selecione uma obra')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      if (editingId) {
+        const atual = criterios.find(c => c.id === editingId)
+        const payload = {
+          nome: formData.nome,
+          tipo: formData.tipo as any,
+          percentual: formData.percentual ? parseFloat(formData.percentual) : undefined,
+          condicao: formData.condicao,
+          aplicacao: formData.aplicacao,
+          obra: obraId,
+          ativo: atual?.ativo ?? true,
+        }
+        const updated = await criteriosApi.atualizar(editingId, payload)
+        setCriterios(prev => prev.map(c => c.id === editingId ? {
+          id: updated.id,
+          nome: updated.nome,
+          tipo: updated.tipo as any,
+          percentual: updated.percentual,
+          condicao: updated.condicao || '',
+          aplicacao: updated.aplicacao || '',
+          ativo: !!updated.ativo,
+          obra: updated.obra,
+        } : c))
+      } else {
+        const payload = {
+          nome: formData.nome,
+          tipo: formData.tipo as any,
+          percentual: formData.percentual ? parseFloat(formData.percentual) : undefined,
+          condicao: formData.condicao,
+          aplicacao: formData.aplicacao,
+          obra: obraId,
+          ativo: true,
+        }
+        const created = await criteriosApi.criar(payload)
+        const novo: CriterioUI = {
+          id: created.id,
+          nome: created.nome,
+          tipo: created.tipo as any,
+          percentual: created.percentual,
+          condicao: created.condicao || '',
+          aplicacao: created.aplicacao || '',
+          ativo: !!created.ativo,
+          obra: created.obra,
+        }
+        setCriterios(prev => [novo, ...prev])
+      }
+      setFormData({
+        nome: "",
+        tipo: "desconto",
+        percentual: "",
+        condicao: "",
+        aplicacao: "",
+        descricao: "",
+      })
+      setEditingId(null)
+      setShowForm(false)
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao salvar critério')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const toggleStatus = (id: string) => {
-    setCriterios(criterios.map(c => 
-      c.id === id ? { ...c, ativo: !c.ativo } : c
-    ))
+  const handleDelete = async (id: number) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await criteriosApi.deletar(id)
+      setCriterios(prev => prev.filter(c => c.id !== id))
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao remover critério')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getTipoBadge = (tipo: Criterio["tipo"]) => {
+  const toggleStatus = async (id: number) => {
+    const atual = criterios.find(c => c.id === id)
+    if (!atual) return
+    setLoading(true)
+    setError(null)
+    try {
+      // Alguns backends exigem PUT com todos os campos obrigatórios
+      const payload = {
+        nome: atual.nome,
+        tipo: atual.tipo as any,
+        percentual: atual.percentual,
+        condicao: atual.condicao,
+        aplicacao: atual.aplicacao,
+        obra: atual.obra,
+        ativo: !atual.ativo,
+      }
+      const updated = await criteriosApi.atualizar(id, payload)
+      setCriterios(prev => prev.map(c => c.id === id ? {
+        ...c,
+        ativo: !!updated.ativo,
+      } : c))
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao alterar status')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getTipoBadge = (tipo: CriterioUI["tipo"]) => {
     const variants = {
       desconto: { label: "Desconto", className: "bg-destructive/10 text-destructive border-destructive/30" },
       acrescimo: { label: "Acréscimo", className: "bg-success/10 text-success border-success/30" },
@@ -132,6 +231,9 @@ export default function CriteriosMedicaoPage() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {error && (
+          <div className="mb-4 text-sm text-destructive">{error}</div>
+        )}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -142,7 +244,7 @@ export default function CriteriosMedicaoPage() {
               className="pl-10"
             />
           </div>
-          <Button onClick={() => setShowForm(!showForm)} className="bg-secondary hover:bg-secondary/90">
+          <Button onClick={() => setShowForm(!showForm)} className="bg-secondary hover:bg-secondary/90" disabled={!tokens?.access}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Critério
           </Button>
@@ -164,7 +266,7 @@ export default function CriteriosMedicaoPage() {
           </CardContent>
         </Card>
 
-        {showForm && (
+        {showForm && tokens?.access && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Novo Critério</CardTitle>
@@ -194,6 +296,23 @@ export default function CriteriosMedicaoPage() {
                       <option value="desconto">Desconto</option>
                       <option value="acrescimo">Acréscimo</option>
                       <option value="regra">Regra Personalizada</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Obra *</label>
+                    <select
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      value={obraId ?? ''}
+                      onChange={(e) => setObraId(Number(e.target.value))}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {obras.map(o => (
+                        <option key={o.id} value={o.id}>{o.nome}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -246,7 +365,7 @@ export default function CriteriosMedicaoPage() {
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" className="bg-secondary hover:bg-secondary/90">
+                  <Button type="submit" className="bg-secondary hover:bg-secondary/90" disabled={loading}>
                     Cadastrar
                   </Button>
                 </div>
@@ -284,10 +403,26 @@ export default function CriteriosMedicaoPage() {
                     >
                       {criterio.ativo ? "Desativar" : "Ativar"}
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingId(criterio.id)
+                        setFormData({
+                          nome: criterio.nome,
+                          tipo: criterio.tipo,
+                          percentual: criterio.percentual != null ? String(criterio.percentual) : "",
+                          condicao: criterio.condicao,
+                          aplicacao: criterio.aplicacao,
+                          descricao: "",
+                        })
+                        setObraId(criterio.obra)
+                        setShowForm(true)
+                      }}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive">
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(criterio.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
