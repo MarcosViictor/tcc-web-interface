@@ -19,8 +19,12 @@ import {
   Building2
 } from "lucide-react"
 import Link from "next/link"
+import { useCsvApi, type ExportTipo } from "@/api/CsvApi"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function ExportarDadosPage() {
+  const { tokens } = useAuth()
+  const { exportar } = useCsvApi()
   const [selectedType, setSelectedType] = useState<string>("")
   const [selectedFormat, setSelectedFormat] = useState<"csv" | "excel" | "pdf">("csv")
   const [dateRange, setDateRange] = useState({
@@ -82,29 +86,37 @@ export default function ExportarDadosPage() {
   ]
 
   const handleExport = async () => {
-    setIsExporting(true)
-
-    // TODO: Chamar API de exportação
-    const payload = {
-      tipo: selectedType,
-      formato: selectedFormat,
-      dataInicio: dateRange.inicio,
-      dataFim: dateRange.fim,
-      filtros: filters,
+    if (!selectedType) return
+    if (!tokens?.access) {
+      alert("Você precisa estar autenticado para exportar.")
+      return
     }
+    try {
+      setIsExporting(true)
+      const blob = await exportar(selectedType as ExportTipo, {
+        inicio: dateRange.inicio || undefined,
+        fim: dateRange.fim || undefined,
+        obra: filters.obra || undefined,
+        equipamento: filters.equipamento || undefined,
+        funcionario: filters.funcionario || undefined,
+        atividade: filters.atividade || undefined,
+        status: filters.status !== "todos" ? filters.status : undefined,
+      })
 
-    console.log("Exportando dados:", payload)
-
-    // Simular download
-    setTimeout(() => {
-      // TODO: Implementar download real do backend
-      const filename = `${selectedType}_${new Date().toISOString().split('T')[0]}.${selectedFormat}`
-      console.log(`Arquivo gerado: ${filename}`)
-      
-      // Simular sucesso
-      alert(`Exportação concluída!\n\nArquivo: ${filename}\n\nEm produção, o download iniciará automaticamente.`)
+      const filename = `${selectedType}_${new Date().toISOString().split("T")[0]}.csv`
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(e?.message || "Falha ao exportar dados")
+    } finally {
       setIsExporting(false)
-    }, 2000)
+    }
   }
 
   const tipoSelecionado = tiposExportacao.find(t => t.id === selectedType)

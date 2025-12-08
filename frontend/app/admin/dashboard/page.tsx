@@ -1,10 +1,59 @@
+"use client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, Users, Truck, AlertTriangle, CheckCircle2, Clock, FileText, Upload, Download } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import { useDashboardApi, type DashboardStats } from "@/api/DashboardApi"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function AdminDashboard() {
+  const { user, tokens } = useAuth()
+  const { getStats } = useDashboardApi()
+  const [stats, setStats] = useState<DashboardStats>({})
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      if (!tokens?.access) {
+        setError("Não autenticado")
+        return
+      }
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await getStats()
+        if (mounted) setStats(data)
+      } catch (e: any) {
+        if (mounted) setError(e?.message || "Falha ao carregar estatísticas")
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [tokens?.access])
+
+  const kpiEntries = useMemo(() => Object.entries(stats), [stats])
+
+  function prettifyKey(key: string) {
+    return key.replaceAll("_", " ").replace(/^(.)/, (c) => c.toUpperCase())
+  }
+
+  function iconForKey(key: string) {
+    if (key.includes("equipament")) return Truck
+    if (key.includes("obra")) return FileText
+    if (key.includes("usuario") || key.includes("funcionario")) return Users
+    if (key.includes("alerta") || key.includes("pendente") || key.includes("validar")) return AlertTriangle
+    if (key.includes("disponibilidade") || key.includes("conciliado")) return CheckCircle2
+    return TrendingUp
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -13,7 +62,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Painel Administrativo</h1>
-              <p className="text-sm text-muted-foreground">Obra: Rodovia BR-116 - Trecho Cariri</p>
+              <p className="text-sm text-muted-foreground">{user?.nome ? `Usuário: ${user.nome}` : ""}</p>
             </div>
             <Link href="/">
               <Button variant="outline">Sair</Button>
@@ -25,59 +74,43 @@ export default function AdminDashboard() {
       <div className="container mx-auto px-4 py-6">
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Equipamentos Ativos</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">24</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <TrendingUp className="h-3 w-3 text-success" />
-                <span className="text-success">+2</span> desde ontem
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Mão de Obra</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">156</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <span className="text-muted-foreground">Funcionários presentes hoje</span>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Disponibilidade Mecânica</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">87.5%</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <TrendingUp className="h-3 w-3 text-success" />
-                <span className="text-success">+3.2%</span> vs. mês anterior
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Alertas Pendentes</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">7</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <span className="text-warning">3 críticos</span> requerem atenção
-              </p>
-            </CardContent>
-          </Card>
+          {loading && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Carregando...</CardTitle>
+              </CardHeader>
+            </Card>
+          )}
+          {error && !loading && (
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle>Erro</CardTitle>
+                <CardDescription className="text-destructive">{error}</CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+          {!loading && !error && kpiEntries.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Nenhuma estatística</CardTitle>
+                <CardDescription>Sem dados para exibir</CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+          {!loading && !error && kpiEntries.map(([key, value]) => {
+            const Icon = iconForKey(key)
+            return (
+              <Card key={key}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">{prettifyKey(key)}</CardTitle>
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{value}</div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
         {/* Tabs de Navegação */}
